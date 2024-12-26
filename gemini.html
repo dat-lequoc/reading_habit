@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reading Habit Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .add-book-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 3rem;
+            height: 3rem;
+            background: #3b82f6;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+            z-index: 50;
+        }
+
+        .add-book-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .heatmap-cell {
+            height: 64px;
+            border: 1px solid #e5e7eb;
+            cursor: pointer;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+            width: 100%;
+        }
+
+        .heatmap-cell:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .heatmap-row {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 0.5rem;
+            flex: 1;
+        }
+
+        .book-label {
+            font-size: 0.7rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 0.25rem;
+        }
+
+        .heatmap-book-row {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: 0.5rem;
+            margin: 0.5rem 0;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 p-6 font-sans">
+    <header class="mb-6 flex items-center justify-between">
+        <h1 class="text-xl font-bold">Reading Habit Tracker</h1>
+    </header>
+
+    <main class="grid gap-6">
+        <!-- Add Book Modal -->
+        <div id="add-book-modal"
+            class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden z-50">
+            <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold">Add New Book</h2>
+                    <button type="button" onclick="toggleAddBookModal()"
+                        class="text-gray-500 hover:text-gray-700">×</button>
+                </div>
+                <form id="add-book-form" class="space-y-3">
+                    <div>
+                        <label for="book-title" class="block text-sm font-medium text-gray-700">Title</label>
+                        <input type="text" id="book-title" required
+                            class="mt-1 p-2 w-full border rounded focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="total-pages" class="block text-sm font-medium text-gray-700">Total Pages</label>
+                        <input type="number" id="total-pages" required
+                            class="mt-1 p-2 w-full border rounded focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <fieldset class="border p-3 rounded">
+                        <legend class="text-sm font-medium">Goal</legend>
+                        <div class="space-y-1">
+                            <div>
+                                <input type="radio" id="goal-date" name="goal-type" value="date" class="mr-1">
+                                <label for="goal-date" class="text-sm">Target Date</label>
+                                <input type="date" id="target-date" class="mt-1 ml-2 p-1.5 border rounded text-sm"
+                                    disabled>
+                            </div>
+                            <div>
+                                <input type="radio" id="goal-pages" name="goal-type" value="pages" class="mr-1">
+                                <label for="goal-pages" class="text-sm">Pages/Day</label>
+                                <input type="number" id="pages-per-day" class="mt-1 ml-2 p-1.5 border rounded text-sm"
+                                    disabled>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <div>
+                        <label for="start-date" class="block text-sm font-medium text-gray-700">Start Date</label>
+                        <input type="date" id="start-date" required
+                            class="mt-1 p-2 w-full border rounded focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <button type="submit"
+                        class="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Add
+                        Book</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Floating Add Button -->
+        <button type="button" onclick="toggleAddBookModal()" class="add-book-btn">+</button>
+
+        <section id="book-list" class="bg-white p-4 rounded shadow">
+            <h2 class="text-lg font-semibold mb-3">My Books</h2>
+            <div class="space-y-4" id="book-entries">
+                <!-- Book entries will be dynamically added here -->
+            </div>
+        </section>
+    </main>
+
+    <section id="stats-history" class="bg-white p-4 rounded shadow mt-6 md:mt-0">
+        <h2 class="text-lg font-semibold mb-3">Statistics & History</h2>
+        <div id="weekly-heatmap" class="mb-6">
+            <h3 class="text-lg font-bold mb-4">This Week's Reading Activity</h3>
+            <div class="grid grid-cols-[100px_1fr] items-start">
+                <div></div>
+                <div class="grid grid-cols-7 gap-2 text-center text-sm font-medium text-gray-600">
+                    <div>Sun</div>
+                    <div>Mon</div>
+                    <div>Tue</div>
+                    <div>Wed</div>
+                    <div>Thu</div>
+                    <div>Fri</div>
+                    <div>Sat</div>
+                </div>
+            </div>
+            <div id="heatmap-container">
+                <!-- Book rows will be generated here -->
+            </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4 text-sm">
+            <div id="streaks">
+                <h3 class="font-semibold mb-1">Streaks</h3>
+                <p>Current: <span id="current-streak" class="font-medium">0</span> days</p>
+                <p>Longest: <span id="longest-streak" class="font-medium">0</span> days</p>
+                <p>Weekly Completion: <span id="weekly-completion" class="font-medium">0%</span></p>
+            </div>
+            <div id="historical-stats">
+                <h3 class="font-semibold mb-1">Statistics</h3>
+                <p>Avg Pages/Day: <span id="avg-pages" class="font-medium">0</span></p>
+                <p>Books Completed: <span id="total-books-completed" class="font-medium">0</span></p>
+                <p>Total Pages Read: <span id="total-pages-read" class="font-medium">0</span></p>
+                <p>Best Reading Day: <span id="best-day" class="font-medium"></span></p>
+            </div>
+        </div>
+    </section>
+
+    <div id="edit-history-modal" class="fixed z-10 inset-0 overflow-y-auto hidden" aria-labelledby="modal-title"
+        role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+            <div
+                class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Edit Reading History</h3>
+                    <div class="mt-2">
+                        <p class="text-sm text-gray-500">Modify pages read for <span id="edit-date"></span> for book
+                            <span id="edit-book-title"></span>.</p>
+                        <input type="number" id="edit-pages-read"
+                            class="mt-2 p-2 border rounded w-full focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button"
+                        class="ml-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        onclick="saveEditModal()">Save</button>
+                    <button type="button"
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                        onclick="closeEditModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <section id="data-management" class="bg-white p-4 rounded shadow mt-6">
+        <h2 class="text-lg font-semibold mb-3">Data Management</h2>
+        <div class="flex space-x-2 items-center">
+            <button type="button" id="export-data"
+                class="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 text-sm">Export
+                Data</button>
+            <input type="file" id="import-data" accept=".json" class="hidden">
+            <button type="button" id="import-data-button"
+                class="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 text-sm">Import
+                Data</button>
+        </div>
+    </section>
+
+    <!-- Edit Book Modal -->
+    <div id="edit-book-modal"
+        class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden z-50">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold">Edit Book</h2>
+                <button type="button" onclick="closeEditBookModal()"
+                    class="text-gray-500 hover:text-gray-700">×</button>
+            </div>
+            <form id="edit-book-form" class="space-y-3">
+                <input type="hidden" id="edit-book-index">
+                <div>
+                    <label for="edit-book-title" class="block text-sm font-medium text-gray-700">Title</label>
+                    <input type="text" id="edit-book-title" required
+                        class="mt-1 p-2 w-full border rounded focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label for="edit-total-pages" class="block text-sm font-medium text-gray-700">Total Pages</label>
+                    <input type="number" id="edit-total-pages" required
+                        class="mt-1 p-2 w-full border rounded focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <fieldset class="border p-3 rounded">
+                    <legend class="text-sm font-medium">Goal</legend>
+                    <div class="space-y-1">
+                        <div>
+                            <input type="radio" id="edit-goal-date" name="edit-goal-type" value="date" class="mr-1">
+                            <label for="edit-goal-date" class="text-sm">Target Date</label>
+                            <input type="date" id="edit-target-date" class="mt-1 ml-2 p-1.5 border rounded text-sm"
+                                disabled>
+                        </div>
+                        <div>
+                            <input type="radio" id="edit-goal-pages" name="edit-goal-type" value="pages" class="mr-1">
+                            <label for="edit-goal-pages" class="text-sm">Pages/Day</label>
+                            <input type="number" id="edit-pages-per-day" class="mt-1 ml-2 p-1.5 border rounded text-sm"
+                                disabled>
+                        </div>
+                    </div>
+                </fieldset>
+                <div>
+                    <label for="edit-start-date" class="block text-sm font-medium text-gray-700">Start Date</label>
+                    <input type="date" id="edit-start-date" required
+                        class="mt-1 p-2 w-full border rounded focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="flex justify-between space-x-2">
+                    <button type="submit"
+                        class="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Save
+                        Changes</button>
+                    <button type="button" onclick="deleteBook()"
+                        class="bg-red-500 text-white py-2 px-4 rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">Delete
+                        Book</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let books = JSON.parse(localStorage.getItem('readingTrackerBooks')) || [];
+
+        function toggleAddBookModal() {
+            const modal = document.getElementById('add-book-modal');
+            modal.classList.toggle('hidden');
+
+            // Set today as default start date when opening the modal
+            if (!modal.classList.contains('hidden')) {
+                const today = formatDate(new Date());
+                document.getElementById('start-date').value = today;
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('readingTrackerBooks', JSON.stringify(books));
+        }
+
+        function calculateDailyGoal(remainingPages, remainingDays) {
+            return remainingDays > 0 ? Math.ceil(remainingPages / remainingDays) : remainingPages;
+        }
+
+        function calculateProgressPercentage(currentPage, totalPages) {
+            return totalPages > 0 ? Math.floor((currentPage / totalPages) * 100) : 0;
+        }
+
+        function formatDate(date) {
+            const d = new Date(date);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function getDaysBetween(start, end) {
+            const startDate = new Date(start);
+            const endDate = new Date(end);
+            const oneDay = 24 * 60 * 60 * 1000;
+            return Math.round(Math.abs((startDate - endDate) / oneDay));
+        }
+
+        function displayBooks() {
+            const bookEntries = document.getElementById('book-entries');
+            bookEntries.innerHTML = '';
+            books.forEach((book, index) => {
+                const now = new Date();
+                const today = formatDate(now);
+                const startDate = new Date(book.startDate);
+                const daysSinceStart = getDaysBetween(book.startDate, today) + (formatDate(startDate) <= today ? 1 : 0);
+                const pagesRemaining = book.totalPages - book.currentPage;
+
+                let targetCompletionDate, remainingDays, dailyGoal;
+
+                if (book.goalType === 'date' && book.targetDate) {
+                    remainingDays = getDaysBetween(today, book.targetDate);
+                    dailyGoal = calculateDailyGoal(pagesRemaining, remainingDays);
+                    targetCompletionDate = book.targetDate;
+                } else if (book.goalType === 'pages' && book.pagesPerDay) {
+                    remainingDays = Math.ceil(pagesRemaining / book.pagesPerDay);
+                    const targetDateObj = new Date(startDate);
+                    targetDateObj.setDate(startDate.getDate() + remainingDays - 1);
+                    targetCompletionDate = formatDate(targetDateObj);
+                    dailyGoal = book.pagesPerDay;
+                } else {
+                    dailyGoal = pagesRemaining; // If no goal set, read remaining pages today
+                    remainingDays = 0;
+                    targetCompletionDate = today;
+                }
+
+                const progressPercent = calculateProgressPercentage(book.currentPage, book.totalPages);
+                const expectedProgress = Math.min(book.totalPages, Math.floor(book.totalPages * (daysSinceStart - 1) / (getDaysBetween(book.startDate, targetCompletionDate) + 1)));
+                const diff = progressPercent - calculateProgressPercentage(expectedProgress, book.totalPages);
+                let statusColor = 'green';
+                if (diff < -25) statusColor = 'red';
+                else if (diff < -10) statusColor = 'yellow';
+
+                const todayReading = book.readingHistory.find(item => item.date === today)?.totalPages || book.currentPage || 0; // Use totalPages for input
+
+                let milestones = [];
+                if (progressPercent >= 25 && progressPercent < 50) milestones.push("25%");
+                if (progressPercent >= 50 && progressPercent < 75) milestones.push("50%");
+                if (progressPercent >= 75 && progressPercent < 100) milestones.push("75%");
+                if (progressPercent === 100) milestones.push("Completed!");
+
+                const bookDiv = document.createElement('div');
+                bookDiv.className = 'bg-gray-50 p-3 rounded border';
+                bookDiv.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <h4 class="text-lg font-semibold">${book.title}</h4>
+                        <button type="button" onclick="openEditBookModal(${index})" class="text-blue-500 hover:text-blue-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm">Progress: ${progressPercent}%</span>
+                        <span class="text-xs text-${statusColor}-500">${statusColor.charAt(0).toUpperCase() + statusColor.slice(1)}</span>
+                    </div>
+                    <div class="relative h-2 rounded bg-blue-200">
+                        <div style="width:${progressPercent}%" class="absolute h-full rounded bg-blue-500"></div>
+                    </div>
+                    <p class="text-sm mt-1">Read: ${book.currentPage} / ${book.totalPages} pages</p>
+                    <div class="mt-1 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                        <p class="text-sm font-medium text-blue-800">Today's Goal: Page ${Math.min(book.currentPage + dailyGoal, book.totalPages)}</p>
+                        <p class="text-xs text-gray-600">Target: ${targetCompletionDate}, Goal: ${dailyGoal} pages/day</p>
+                    </div>
+                    <div class="mt-2 flex items-center space-x-2">
+                        <input type="number" id="pages-read-${index}" value="${todayReading}" class="p-1.5 w-full border rounded text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Current page">
+                        <button type="button" onclick="updateProgress(${index})" class="bg-blue-500 text-white py-1.5 px-3 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-xs">Update</button>
+                    </div>
+                `;
+                bookEntries.appendChild(bookDiv);
+            });
+        }
+
+        function updateProgress(bookIndex) {
+            const pagesReadTodayInput = document.getElementById(`pages-read-${bookIndex}`);
+            const currentPageTotal = parseInt(pagesReadTodayInput.value);
+            if (isNaN(currentPageTotal)) return;
+
+            const today = formatDate(new Date());
+            const book = books[bookIndex];
+
+            if (currentPageTotal < 0 || currentPageTotal > book.totalPages) {
+                alert('Invalid page number.');
+                return;
+            }
+
+            const existingEntryIndex = book.readingHistory.findIndex(item => item.date === today);
+            if (existingEntryIndex > -1) {
+                book.readingHistory[existingEntryIndex].totalPages = currentPageTotal;
+            } else {
+                const pagesReadToday = currentPageTotal - (book.readingHistory.sort((a, b) => new Date(b.date) - new Date(a.date)).find(entry => entry.date < today)?.totalPages || 0);
+                book.readingHistory.push({
+                    date: today,
+                    pagesRead: pagesReadToday > 0 ? pagesReadToday : 0,
+                    totalPages: currentPageTotal
+                });
+            }
+
+            book.currentPage = currentPageTotal;
+            saveData();
+            displayBooks();
+            renderReadingHistoryHeatmap();
+            calculateStreaks();
+            calculateWeeklyCompletionRate();
+            calculateStatistics();
+        }
+
+        function addBook(event) {
+            event.preventDefault();
+            const title = document.getElementById('book-title').value;
+            const totalPages = parseInt(document.getElementById('total-pages').value);
+            const startDate = document.getElementById('start-date').value;
+            const goalType = document.querySelector('input[name="goal-type"]:checked')?.value;
+            const targetDate = document.getElementById('target-date').value;
+            const pagesPerDay = parseInt(document.getElementById('pages-per-day').value);
+
+            if (!title || isNaN(totalPages) || totalPages <= 0 || !startDate || !goalType || (goalType === 'date' && !targetDate) || (goalType === 'pages' && isNaN(pagesPerDay) || pagesPerDay <= 0)) {
+                alert('Please fill in all required fields with valid values.');
+                return;
+            }
+
+            const newBook = {
+                title: title,
+                totalPages: totalPages,
+                currentPage: 0,
+                startDate: startDate,
+                goalType: goalType,
+                targetDate: goalType === 'date' ? targetDate : null,
+                pagesPerDay: goalType === 'pages' ? pagesPerDay : null,
+                readingHistory: []
+            };
+
+            books.push(newBook);
+            saveData();
+            displayBooks();
+            renderReadingHistoryHeatmap();
+            calculateStreaks();
+            calculateWeeklyCompletionRate();
+            calculateStatistics();
+            document.getElementById('add-book-form').reset();
+            toggleAddBookModal(); // Close the modal after adding
+        }
+
+        document.getElementById('add-book-form').addEventListener('submit', addBook);
+
+        document.querySelectorAll('input[name="goal-type"]').forEach(radio => {
+            radio.addEventListener('change', function () {
+                const isDateGoal = this.value === 'date';
+                document.getElementById('target-date').disabled = !isDateGoal;
+                document.getElementById('pages-per-day').disabled = isDateGoal;
+                if (!isDateGoal) document.getElementById('target-date').value = '';
+                if (isDateGoal) document.getElementById('pages-per-day').value = '';
+            });
+        });
+
+        function renderReadingHistoryHeatmap() {
+            const heatmapContainer = document.getElementById('heatmap-container');
+            heatmapContainer.innerHTML = '';
+
+            const today = new Date();
+            const dates = Array.from({ length: 7 }, (_, i) => {
+                const date = new Date(today);
+                date.setDate(today.getDate() - (6 - i));
+                return formatDate(date);
+            });
+
+            // Create a row for each book
+            books.forEach(book => {
+                const bookRow = document.createElement('div');
+                bookRow.className = 'heatmap-book-row';
+
+                // Add book label
+                const label = document.createElement('div');
+                label.className = 'book-label';
+                label.textContent = book.title;
+                bookRow.appendChild(label);
+
+                // Create the heatmap row
+                const heatmapRow = document.createElement('div');
+                heatmapRow.className = 'heatmap-row';
+
+                dates.forEach(date => {
+                    const cell = document.createElement('div');
+                    cell.className = 'heatmap-cell';
+                    cell.dataset.date = date;
+                    cell.dataset.bookTitle = book.title;
+
+                    const history = book.readingHistory.find(item => item.date === date);
+                    const pagesRead = history ? history.pagesRead : 0;
+                    const totalPages = history ? history.totalPages : 0;
+
+                    // Calculate if the day met its goal
+                    const dailyGoal = book.goalType === 'pages' ? book.pagesPerDay : 
+                        (book.goalType === 'date' && book.targetDate ? 
+                            calculateDailyGoal(book.totalPages, getDaysBetween(book.startDate, book.targetDate)) : 0);
+                    
+                    const intensity = Math.min(pagesRead / 50, 1);
+                    const today = new Date();
+                    const cellDate = new Date(date);
+                    const isInPast = cellDate < today && formatDate(cellDate) !== formatDate(today);
+                    
+                    // Use red for past days below goal, blue for current/future or days that met goal
+                    const color = isInPast && pagesRead < dailyGoal ? 
+                        `rgba(239, 68, 68, ${intensity})` : // red-500
+                        `rgba(59, 130, 246, ${intensity})`; // blue-500
+                    
+                    cell.style.backgroundColor = color;
+
+                    // Add date number
+                    const dateDiv = document.createElement('div');
+                    dateDiv.className = `text-xs font-medium ${intensity > 0.5 ? 'text-white' : 'text-gray-700'}`;
+                    dateDiv.textContent = new Date(date).getDate();
+                    cell.appendChild(dateDiv);
+
+                    // Add pages count
+                    const pagesDiv = document.createElement('div');
+                    pagesDiv.className = `text-xs ${intensity > 0.5 ? 'text-white' : 'text-gray-700'}`;
+                    pagesDiv.textContent = pagesRead > 0 ? `At page ${totalPages}` : 'No reading';
+                    cell.appendChild(pagesDiv);
+
+                    cell.addEventListener('click', () => openEditModal(date, book.title));
+                    cell.addEventListener('mouseover', (event) => {
+                        const tooltip = document.createElement('div');
+                        tooltip.textContent = `${book.title}: ${pagesRead} pages on ${date}`;
+                        tooltip.style.position = 'absolute';
+                        tooltip.style.backgroundColor = 'black';
+                        tooltip.style.color = 'white';
+                        tooltip.style.padding = '5px';
+                        tooltip.style.borderRadius = '5px';
+                        tooltip.style.top = `${event.clientY - 30}px`;
+                        tooltip.style.left = `${event.clientX + 10}px`;
+                        tooltip.style.zIndex = '10';
+                        tooltip.style.fontSize = '12px';
+                        document.body.appendChild(tooltip);
+                        cell.addEventListener('mouseout', () => document.body.removeChild(tooltip));
+                    });
+
+                    heatmapRow.appendChild(cell);
+                });
+
+                bookRow.appendChild(heatmapRow);
+                heatmapContainer.appendChild(bookRow);
+            });
+        }
+
+        let editModalDate = null;
+
+        function openEditModal(date, bookTitle) {
+            editModalDate = date;
+            const book = books.find(b => b.title === bookTitle);
+            if (!book) return;
+            const history = book.readingHistory.find(h => h.date === date);
+
+            document.getElementById('edit-date').textContent = date;
+            document.getElementById('edit-book-title').textContent = bookTitle;
+            const currentEntry = history ? history.totalPages : book.readingHistory.sort((a, b) => new Date(b.date) - new Date(a.date)).find(entry => entry.date < date)?.totalPages || 0;
+            document.getElementById('edit-pages-read').value = currentEntry;
+            document.getElementById('edit-history-modal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-history-modal').classList.add('hidden');
+            editModalDate = null;
+        }
+
+        function openEditBookModal(bookIndex) {
+            const book = books[bookIndex];
+            document.getElementById('edit-book-index').value = bookIndex;
+            document.getElementById('edit-book-title').value = book.title;
+            document.getElementById('edit-total-pages').value = book.totalPages;
+            document.getElementById('edit-start-date').value = book.startDate;
+
+            // Set goal type
+            document.getElementById('edit-goal-date').checked = book.goalType === 'date';
+            document.getElementById('edit-goal-pages').checked = book.goalType === 'pages';
+            document.getElementById('edit-target-date').value = book.goalType === 'date' ? book.targetDate : '';
+            document.getElementById('edit-pages-per-day').value = book.goalType === 'pages' ? book.pagesPerDay : '';
+            document.getElementById('edit-target-date').disabled = book.goalType !== 'date';
+            document.getElementById('edit-pages-per-day').disabled = book.goalType !== 'pages';
+
+            document.getElementById('edit-book-modal').classList.remove('hidden');
+        }
+
+        function closeEditBookModal() {
+            document.getElementById('edit-book-modal').classList.add('hidden');
+        }
+
+        document.getElementById('edit-book-form').addEventListener('submit', function (event) {
+            event.preventDefault();
+            const bookIndex = parseInt(document.getElementById('edit-book-index').value);
+            const title = document.getElementById('edit-book-title').value;
+            const totalPages = parseInt(document.getElementById('edit-total-pages').value);
+            const startDate = document.getElementById('edit-start-date').value;
+            const goalType = document.querySelector('input[name="edit-goal-type"]:checked')?.value;
+            const targetDate = document.getElementById('edit-target-date').value;
+            const pagesPerDay = parseInt(document.getElementById('edit-pages-per-day').value);
+
+            if (!title || isNaN(totalPages) || totalPages <= 0 || !startDate || !goalType || (goalType === 'date' && !targetDate) || (goalType === 'pages' && isNaN(pagesPerDay) || pagesPerDay <= 0)) {
+                alert('Please fill in all required fields with valid values.');
+                return;
+            }
+
+            books[bookIndex] = {
+                ...books[bookIndex],
+                title: title,
+                totalPages: totalPages,
+                startDate: startDate,
+                goalType: goalType,
+                targetDate: goalType === 'date' ? targetDate : null,
+                pagesPerDay: goalType === 'pages' ? pagesPerDay : null
+            };
+
+            saveData();
+            displayBooks();
+            renderReadingHistoryHeatmap();
+            calculateStreaks();
+            calculateWeeklyCompletionRate();
+            calculateStatistics();
+            closeEditBookModal();
+        });
+
+        document.querySelectorAll('input[name="edit-goal-type"]').forEach(radio => {
+            radio.addEventListener('change', function () {
+                const isDateGoal = this.value === 'date';
+                document.getElementById('edit-target-date').disabled = !isDateGoal;
+                document.getElementById('edit-pages-per-day').disabled = isDateGoal;
+                if (!isDateGoal) document.getElementById('edit-target-date').value = '';
+                if (isDateGoal) document.getElementById('edit-pages-per-day').value = '';
+            });
+        });
+
+        function deleteBook() {
+            const bookIndex = parseInt(document.getElementById('edit-book-index').value);
+            if (confirm('Are you sure you want to delete this book? This action cannot be undone.')) {
+                books.splice(bookIndex, 1);
+                saveData();
+                displayBooks();
+                renderReadingHistoryHeatmap();
+                calculateStreaks();
+                calculateWeeklyCompletionRate();
+                calculateStatistics();
+                closeEditBookModal();
+            }
+        }
+
+        function saveEditModal() {
+            const currentPageTotal = parseInt(document.getElementById('edit-pages-read').value);
+            if (isNaN(currentPageTotal)) return;
+
+            const bookTitle = document.getElementById('edit-book-title').textContent;
+            const book = books.find(b => b.title === bookTitle);
+
+            if (!book) return;
+
+            if (currentPageTotal < 0 || currentPageTotal > book.totalPages) {
+                alert('Invalid page number.');
+                return;
+            }
+
+            const historyIndex = book.readingHistory.findIndex(item => item.date === editModalDate);
+            const pagesReadToday = currentPageTotal - (book.readingHistory.sort((a, b) => new Date(b.date) - new Date(a.date)).find(entry => entry.date < editModalDate)?.totalPages || 0);
+
+            if (historyIndex > -1) {
+                if (currentPageTotal === 0) {
+                    book.readingHistory.splice(historyIndex, 1);
+                } else {
+                    book.readingHistory[historyIndex].pagesRead = pagesReadToday > 0 ? pagesReadToday : 0;
+                    book.readingHistory[historyIndex].totalPages = currentPageTotal;
+                }
+            } else if (currentPageTotal > 0) {
+                book.readingHistory.push({
+                    date: editModalDate,
+                    pagesRead: pagesReadToday > 0 ? pagesReadToday : 0,
+                    totalPages: currentPageTotal
+                });
+            }
+
+            // Update current page to the latest total
+            const latestEntry = book.readingHistory
+                .filter(entry => new Date(entry.date) <= new Date(editModalDate))
+                .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+            book.currentPage = latestEntry ? latestEntry.totalPages : 0;
+
+            saveData();
+            displayBooks();
+            renderReadingHistoryHeatmap();
+            calculateStreaks();
+            calculateWeeklyCompletionRate();
+            calculateStatistics();
+            closeEditModal();
+        }
+
+        function calculateStreaks() {
+            let currentStreak = 0;
+            let longestStreak = 0;
+            const sortedHistory = [];
+            books.forEach(book => book.readingHistory.forEach(h => sortedHistory.push(h)));
+            sortedHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            let tempStreak = 0;
+            let lastDate = null;
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+
+            sortedHistory.forEach(item => {
+                const currentDate = new Date(item.date);
+                if (lastDate) {
+                    const diffTime = Math.abs(currentDate - lastDate);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    if (diffDays === 1) {
+                        tempStreak++;
+                    } else if (diffDays > 1) {
+                        longestStreak = Math.max(longestStreak, tempStreak);
+                        tempStreak = 1;
+                    }
+                } else if (formatDate(currentDate) === formatDate(yesterday)) {
+                    tempStreak = 1;
+                }
+                lastDate = currentDate;
+            });
+            longestStreak = Math.max(longestStreak, tempStreak);
+
+            // Calculate current streak
+            currentStreak = 0;
+            lastDate = new Date();
+            for (let i = 0; i < sortedHistory.length; i++) {
+                const historyItemDate = new Date(sortedHistory[sortedHistory.length - 1 - i].date);
+                const diffTime = Math.abs(lastDate - historyItemDate);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                if (diffDays <= 1) {
+                    currentStreak++;
+                    lastDate = historyItemDate;
+                } else {
+                    break;
+                }
+            }
+
+            document.getElementById('current-streak').textContent = currentStreak;
+            document.getElementById('longest-streak').textContent = longestStreak;
+        }
+
+        function calculateWeeklyCompletionRate() {
+            const today = new Date();
+            let readingDays = 0;
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() - i);
+                const formattedDate = formatDate(date);
+                let hasRead = false;
+                for (const book of books) {
+                    if (book.readingHistory.some(item => item.date === formattedDate && item.pagesRead > 0)) {
+                        hasRead = true;
+                        break;
+                    }
+                }
+                if (hasRead) readingDays++;
+            }
+            const completionRate = Math.round((readingDays / 7) * 100);
+            document.getElementById('weekly-completion').textContent = `${completionRate}%`;
+        }
+
+        function calculateStatistics() {
+            let totalPagesRead = books.reduce((sum, book) => sum + book.currentPage, 0);
+            let totalBooksCompleted = books.filter(book => book.currentPage === book.totalPages).length;
+            let totalReadingDays = 0;
+            const dailyPages = {};
+
+            books.forEach(book => {
+                book.readingHistory.forEach(item => {
+                    totalReadingDays++;
+                    if (!dailyPages[item.date]) dailyPages[item.date] = 0;
+                    dailyPages[item.date] += item.pagesRead;
+                });
+            });
+
+            const averagePages = totalReadingDays > 0 ? Math.round(totalPagesRead / totalReadingDays) : 0;
+
+            const dayCounts = { '0': 0, '1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0 }; // Sun-Sat
+            books.forEach(book => {
+                book.readingHistory.forEach(item => {
+                    const dayOfWeek = new Date(item.date).getDay();
+                    dayCounts[dayOfWeek] += item.pagesRead;
+                });
+            });
+
+            let bestDay = '';
+            let maxPages = 0;
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            for (const day in dayCounts) {
+                if (dayCounts[day] > maxPages) {
+                    maxPages = dayCounts[day];
+                    bestDay = dayNames[parseInt(day)];
+                }
+            }
+
+            document.getElementById('avg-pages').textContent = averagePages;
+            document.getElementById('total-books-completed').textContent = totalBooksCompleted;
+            document.getElementById('total-pages-read').textContent = totalPagesRead;
+            document.getElementById('best-day').textContent = bestDay;
+        }
+
+        function exportData() {
+            const dataStr = JSON.stringify(books);
+            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+            const exportFileDefaultName = 'reading_tracker_data.json';
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        }
+
+        document.getElementById('export-data').addEventListener('click', exportData);
+
+        document.getElementById('import-data-button').addEventListener('click', () => document.getElementById('import-data').click());
+
+        document.getElementById('import-data').addEventListener('change', function (event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    try {
+                        books = JSON.parse(e.target.result);
+                        saveData();
+                        displayBooks();
+                        renderReadingHistoryHeatmap();
+                        calculateStreaks();
+                        calculateWeeklyCompletionRate();
+                        calculateStatistics();
+                    } catch (error) {
+                        alert('Error parsing imported data.');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        displayBooks();
+        renderReadingHistoryHeatmap();
+        calculateStreaks();
+        calculateWeeklyCompletionRate();
+        calculateStatistics();
+    </script>
+
+</body>
+
+</html>
