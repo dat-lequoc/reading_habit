@@ -140,21 +140,8 @@
     </main>
 
     <section id="stats-history" class="bg-white p-4 rounded shadow mt-6 md:mt-0">
-        <h2 class="text-lg font-semibold mb-3">Statistics & History</h2>
         <div id="weekly-heatmap" class="mb-6">
-            <h3 class="text-lg font-bold mb-4">This Week's Reading Activity</h3>
-            <div class="grid grid-cols-[100px_1fr] items-start">
-                <div></div>
-                <div class="grid grid-cols-7 gap-2 text-center text-sm font-medium text-gray-600">
-                    <div>Sun</div>
-                    <div>Mon</div>
-                    <div>Tue</div>
-                    <div>Wed</div>
-                    <div>Thu</div>
-                    <div>Fri</div>
-                    <div>Sat</div>
-                </div>
-            </div>
+            <h2 class="text-lg font-bold mb-4">This Week's Reading Activity</h2>
             <div id="heatmap-container">
                 <!-- Book rows will be generated here -->
             </div>
@@ -491,8 +478,20 @@
                 <div class="grid grid-cols-7 gap-2 text-center text-sm font-medium text-gray-600">
                     ${dates.map(date => {
                         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                        const dayIcons = [
+                            '☀️', // Sun - sun
+                            '🌙', // Mon - moon
+                            '⚡', // Tue - lightning
+                            '💧', // Wed - water drop
+                            '🔥', // Thu - fire
+                            '🌟', // Fri - star
+                            '🌍'  // Sat - earth
+                        ];
                         const dayIndex = new Date(date).getDay();
-                        return `<div>${dayNames[dayIndex]}</div>`;
+                        return `<div class="flex items-center justify-center gap-1">
+                            <span>${dayIcons[dayIndex]}</span>
+                            <span>${dayNames[dayIndex]}</span>
+                        </div>`;
                     }).join('')}
                 </div>
             `;
