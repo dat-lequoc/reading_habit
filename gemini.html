@@ -208,12 +208,14 @@
         <h2 class="text-lg font-semibold mb-3">Data Management</h2>
         <div class="flex space-x-2 items-center">
             <button type="button" id="export-data"
-                class="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 text-sm">Export
-                Data</button>
+                class="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm">
+                Export Data
+            </button>
             <input type="file" id="import-data" accept=".json" class="hidden">
             <button type="button" id="import-data-button"
-                class="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 text-sm">Import
-                Data</button>
+                class="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm">
+                Import Data
+            </button>
         </div>
     </section>
 
@@ -480,6 +482,21 @@
                 date.setDate(today.getDate() - (6 - i));
                 return formatDate(date);
             });
+
+            // Create and insert the day headers
+            const headerRow = document.createElement('div');
+            headerRow.className = 'grid grid-cols-[100px_1fr] items-start mb-2';
+            headerRow.innerHTML = `
+                <div></div>
+                <div class="grid grid-cols-7 gap-2 text-center text-sm font-medium text-gray-600">
+                    ${dates.map(date => {
+                        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                        const dayIndex = new Date(date).getDay();
+                        return `<div>${dayNames[dayIndex]}</div>`;
+                    }).join('')}
+                </div>
+            `;
+            heatmapContainer.appendChild(headerRow);
 
             // Create a row for each book
             books.forEach(book => {
@@ -837,19 +854,29 @@
                 const reader = new FileReader();
                 reader.onload = function (e) {
                     try {
-                        books = JSON.parse(e.target.result);
-                        saveData();
-                        displayBooks();
-                        renderReadingHistoryHeatmap();
-                        calculateStreaks();
-                        calculateWeeklyCompletionRate();
-                        calculateStatistics();
+                        const importedData = JSON.parse(e.target.result);
+                        if (Array.isArray(importedData)) {
+                            if (confirm('This will replace your current data. Are you sure you want to continue?')) {
+                                books = importedData;
+                                saveData();
+                                displayBooks();
+                                renderReadingHistoryHeatmap();
+                                calculateStreaks();
+                                calculateWeeklyCompletionRate();
+                                calculateStatistics();
+                                alert('Data imported successfully!');
+                            }
+                        } else {
+                            throw new Error('Invalid data format');
+                        }
                     } catch (error) {
-                        alert('Error parsing imported data.');
+                        alert('Error: Invalid file format. Please make sure you are importing a valid reading tracker data file.');
                     }
                 };
                 reader.readAsText(file);
             }
+            // Reset the input so the same file can be imported again if needed
+            event.target.value = '';
         });
 
         displayBooks();
