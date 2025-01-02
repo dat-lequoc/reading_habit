@@ -681,10 +681,17 @@
             const container = target.closest("[data-book-index]");
             if (!container) return;
             const bookIndex = container.dataset.bookIndex;
+
+            // Check if the click is on the edit button or its SVG child
+            const isEditButton = target.matches(".edit-book-btn, .edit-book-btn *, svg, path");
+            if (isEditButton) {
+              e.stopPropagation(); // Prevent the click from triggering the header click
+              this.openEditBookModal(bookIndex);
+              return;
+            }
+
             if (target.matches(".book-header, .book-header *")) {
               this.toggleBookContent(bookIndex);
-            } else if (target.matches(".edit-book-btn, .edit-book-btn *")) {
-              this.openEditBookModal(bookIndex);
             } else if (target.matches(".update-progress-btn, .update-progress-btn *")) {
               const input = container.querySelector("input[type='number']");
               this.updateProgress(bookIndex, parseInt(input.value, 10), formatDate(new Date()));
