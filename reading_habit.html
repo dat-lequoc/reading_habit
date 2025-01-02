@@ -474,6 +474,7 @@
         this.targetDate = data.targetDate;
         this.pagesPerDay = data.pagesPerDay;
         this.readingHistory = data.readingHistory || [];
+        this.lockedDailyGoals = data.lockedDailyGoals || {};
       }
 
       updateProgress(currentPageTotal, date) {
@@ -515,14 +516,36 @@
         };
       }
 
-      getDailyGoal(currentDate) {
-        const pagesRemaining = this.totalPages - this.currentPage;
+      calculateDailyGoalFromYesterday(today) {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = formatDate(yesterday);
+        
+        // Get pages read up to yesterday
+        const sortedHistory = [...this.readingHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
+        const pagesAsOfYesterday = sortedHistory.find(entry => entry.date <= yesterdayStr)?.totalPages || 0;
+        
+        // Calculate remaining pages from yesterday's progress
+        const pagesRemaining = this.totalPages - pagesAsOfYesterday;
+        
         if (this.goalType === "pages") return this.pagesPerDay;
         if (this.goalType === "date" && this.targetDate) {
-          const remainingDays = Utils.getDaysBetween(currentDate, this.targetDate);
+          const remainingDays = Utils.getDaysBetween(today, this.targetDate);
           return Utils.calculateDailyGoal(pagesRemaining, remainingDays);
         }
         return 0;
+      }
+
+      lockDailyGoalFor(dateStr) {
+        if (!this.lockedDailyGoals[dateStr]) {
+          this.lockedDailyGoals[dateStr] = this.calculateDailyGoalFromYesterday(dateStr);
+        }
+        return this.lockedDailyGoals[dateStr];
+      }
+
+      getDailyGoal(currentDate) {
+        const dateStr = formatDate(new Date(currentDate));
+        return this.lockDailyGoalFor(dateStr);
       }
     }
 
@@ -620,6 +643,15 @@
               const dailyGoal = book.getDailyGoal(today);
               const todayReading =
                 book.readingHistory.find((item) => item.date === today)?.totalPages || book.currentPage;
+              
+              // Get yesterday's progress for target calculation
+              const yesterday = new Date(today);
+              yesterday.setDate(yesterday.getDate() - 1);
+              const yesterdayStr = formatDate(yesterday);
+              const sortedHistory = [...book.readingHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
+              const pagesAsOfYesterday = sortedHistory.find(entry => entry.date <= yesterdayStr)?.totalPages || 0;
+              const targetPage = Math.min(pagesAsOfYesterday + dailyGoal, book.totalPages);
+
               return `
                 <div
                   class="bg-gray-50 p-3 rounded border ${progress.isCompleted ? "completed-book" : ""} relative"
@@ -657,7 +689,7 @@
                       <p class="text-sm mt-1">Read: ${progress.currentPage} / ${progress.totalPages} pages</p>
                       <div class="mt-1 p-2 bg-blue-50 border border-blue-200 rounded-md">
                         <p class="text-sm font-medium text-blue-800">
-                          Today's Goal: Page ${Math.min(book.currentPage + dailyGoal, book.totalPages)}
+                          Today's Goal: Page ${targetPage}
                         </p>
                       </div>
                       <div class="mt-2 flex items-center space-x-2">
