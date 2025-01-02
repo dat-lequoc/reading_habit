@@ -1085,7 +1085,8 @@
           const bookRow = document.createElement("div");
           bookRow.className = "heatmap-book-row";
           const label = document.createElement("div");
-          label.className = "book-label";
+          const isCompleted = book.currentPage === book.totalPages;
+          label.className = `book-label ${isCompleted ? 'bg-green-100 border-green-500 text-green-800' : 'bg-gray-50 border-gray-200 text-gray-700'}`;
           label.textContent = book.title;
           bookRow.appendChild(label);
 
@@ -1104,10 +1105,18 @@
             const intensity = Math.min(pagesRead / 50, 1);
             const cellDate = new Date(date);
             const isInPast = cellDate < today && formatDate(cellDate) !== formatDate(today);
-            const color =
-              isInPast && pagesRead < dailyGoal
+            const isCompleted = book.currentPage === book.totalPages;
+            
+            let color;
+            if (isCompleted) {
+              // Use green color scheme for completed books
+              color = `rgba(16, 185, 129, ${intensity})`; // Tailwind's green-500
+            } else {
+              // Use blue/red scheme for in-progress books
+              color = isInPast && pagesRead < dailyGoal
                 ? `rgba(239, 68, 68, ${intensity})`
                 : `rgba(59, 130, 246, ${intensity})`;
+            }
             cell.style.backgroundColor = color;
             cell.innerHTML = `
               <div class="text-xs font-medium ${intensity > 0.5 ? "text-white" : "text-gray-700"}">
