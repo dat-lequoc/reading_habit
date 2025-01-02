@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Reading Habit Tracker</title>
+  <title>A Year of Reading</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .add-book-btn {
@@ -94,7 +94,7 @@
 </head>
 <body class="bg-gray-100 p-6 font-sans">
   <header class="mb-6 flex items-center justify-between">
-    <h1 class="text-xl font-bold">Reading Habit Tracker</h1>
+    <h1 class="text-xl font-bold">A Year of Reading</h1>
   </header>
   <main class="grid gap-6">
     <div
@@ -195,6 +195,76 @@
       </div>
     </div>
   </section>
+
+  <!-- New Reading Challenge Section -->
+  <section id="reading-challenge" class="bg-white p-4 rounded shadow mt-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-bold">Yearly Reading Challenge</h2>
+      <button
+        id="edit-goal-btn"
+        class="text-blue-500 hover:text-blue-700 flex items-center gap-1"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+        </svg>
+        Edit Goal
+      </button>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <div class="flex justify-between items-center text-sm mb-2">
+          <span>Books Progress</span>
+          <span><span id="completed-books" class="font-medium">0</span>/<span id="yearly-goal" class="font-medium">52</span> books</span>
+        </div>
+        <div class="relative h-4 rounded-full bg-gray-200 overflow-hidden">
+          <div id="challenge-progress" class="absolute h-full bg-green-500 transition-all duration-500"></div>
+        </div>
+      </div>
+      <div>
+        <div class="flex justify-between items-center text-sm mb-2">
+          <span>Year Progress</span>
+          <span>Day <span id="current-day" class="font-medium">0</span>/365</span>
+        </div>
+        <div class="relative h-4 rounded-full bg-gray-200 overflow-hidden">
+          <div id="year-progress" class="absolute h-full bg-blue-500 transition-all duration-500"></div>
+        </div>
+      </div>
+      <div class="flex justify-between items-center text-sm pt-2">
+        <span>Week: <span id="current-week" class="font-medium">0</span>/52</span>
+        <span>On Track: <span id="on-track-status" class="font-medium">Yes</span></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- New Goal Edit Modal -->
+  <div
+    id="edit-goal-modal"
+    class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden z-50"
+  >
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold">Edit Reading Goal</h3>
+        <button type="button" class="modal-close text-gray-500 hover:text-gray-700">×</button>
+      </div>
+      <form id="edit-goal-form" class="space-y-4">
+        <div>
+          <label for="yearly-goal-input" class="block text-sm font-medium text-gray-700">Books to read in <span id="current-year"></span></label>
+          <input
+            type="number"
+            id="yearly-goal-input"
+            min="1"
+            class="mt-1 p-2 w-full border rounded focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        <button
+          type="submit"
+          class="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        >
+          Save Goal
+        </button>
+      </form>
+    </div>
+  </div>
   <div
     id="edit-history-modal"
     class="fixed z-10 inset-0 overflow-y-auto hidden"
@@ -454,12 +524,14 @@
       constructor() {
         this.books = [];
         this.$bookEntries = $("book-entries");
+        this.yearlyGoal = parseInt(localStorage.getItem('yearlyReadingGoal')) || 52;
         this.loadBooks();
       }
 
       init() {
         this.setupEventListeners();
         this.updateUI();
+        this.updateReadingChallenge();
       }
 
       loadBooks() {
@@ -509,6 +581,7 @@
         this.displayBooks();
         this.renderReadingHistoryHeatmap();
         this.calculateStats();
+        this.updateReadingChallenge();
       }
 
       displayBooks() {
@@ -552,7 +625,7 @@
                       </button>
                     </div>
                   </div>
-                  <div id="book-content-${index}" class="book-content">
+                  <div id="book-content-${index}" class="book-content ${progress.isCompleted ? 'collapsed' : ''}">
                     <div class="mt-2">
                       <div class="flex items-center justify-between mb-1">
                         <span class="text-sm">Progress: ${progress.percentage}%</span>
@@ -660,6 +733,16 @@
         if (importDataBtn && importDataInput) {
           importDataBtn.addEventListener("click", () => importDataInput.click());
           importDataInput.addEventListener("change", (e) => this.handleImport(e));
+        }
+
+        const editGoalBtn = $("edit-goal-btn");
+        if (editGoalBtn) {
+          editGoalBtn.addEventListener("click", () => this.openEditGoalModal());
+        }
+
+        const editGoalForm = $("edit-goal-form");
+        if (editGoalForm) {
+          editGoalForm.addEventListener("submit", (e) => this.handleEditGoal(e));
         }
       }
 
@@ -1041,6 +1124,70 @@
         };
         reader.readAsText(file);
         event.target.value = "";
+      }
+
+      openEditGoalModal() {
+        const modal = $("edit-goal-modal");
+        const yearInput = $("yearly-goal-input");
+        const yearSpan = $("current-year");
+        
+        yearSpan.textContent = new Date().getFullYear();
+        yearInput.value = this.yearlyGoal;
+        modal.classList.remove("hidden");
+      }
+
+      handleEditGoal(event) {
+        event.preventDefault();
+        const newGoal = parseInt($("yearly-goal-input").value);
+        if (newGoal > 0) {
+          this.yearlyGoal = newGoal;
+          localStorage.setItem('yearlyReadingGoal', newGoal);
+          this.updateReadingChallenge();
+          $("edit-goal-modal").classList.add("hidden");
+        }
+      }
+
+      updateReadingChallenge() {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), 0, 1);
+        const diff = now - start;
+        const oneDay = 1000 * 60 * 60 * 24;
+        const oneWeek = oneDay * 7;
+        
+        // Calculate days and weeks
+        const currentDay = Math.ceil(diff / oneDay);
+        const currentWeek = Math.ceil(diff / oneWeek);
+        
+        // Calculate year progress
+        const isLeapYear = new Date(now.getFullYear(), 1, 29).getMonth() === 1;
+        const daysInYear = isLeapYear ? 366 : 365;
+        const yearProgressPercentage = (currentDay / daysInYear) * 100;
+        
+        // Calculate books progress
+        const completedBooks = this.books.filter(book => 
+          book.currentPage === book.totalPages
+        ).length;
+        
+        const weeklyTarget = this.yearlyGoal / 52;
+        const expectedProgress = currentWeek * weeklyTarget;
+        const isOnTrack = completedBooks >= expectedProgress;
+        
+        const booksProgressPercentage = (completedBooks / this.yearlyGoal) * 100;
+        
+        // Update UI elements
+        $("yearly-goal").textContent = this.yearlyGoal;
+        $("current-week").textContent = currentWeek;
+        $("current-day").textContent = currentDay;
+        $("completed-books").textContent = completedBooks;
+        $("on-track-status").textContent = isOnTrack ? "Yes" : "No";
+        $("on-track-status").className = `font-medium ${isOnTrack ? 'text-green-600' : 'text-red-600'}`;
+        
+        // Update progress bars
+        const booksProgressBar = $("challenge-progress");
+        const yearProgressBar = $("year-progress");
+        
+        booksProgressBar.style.width = `${booksProgressPercentage}%`;
+        yearProgressBar.style.width = `${yearProgressPercentage}%`;
       }
     }
 
