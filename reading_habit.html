@@ -183,7 +183,7 @@
                     <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Edit Reading History</h3>
                     <div class="mt-2">
                         <p class="text-sm text-gray-500">Modify pages read for <span id="edit-date"></span> for book
-                            <span id="edit-book-title"></span>.</p>
+                            <span id="edit-history-book-title"></span>.</p>
                         <input type="number" id="edit-pages-read"
                             class="mt-2 p-2 border rounded w-full focus:ring-blue-500 focus:border-blue-500">
                     </div>
@@ -594,7 +594,7 @@
             const history = book.readingHistory.find(h => h.date === date);
 
             document.getElementById('edit-date').textContent = date;
-            document.getElementById('edit-book-title').textContent = bookTitle;
+            document.getElementById('edit-history-book-title').textContent = bookTitle;
             const currentEntry = history ? history.totalPages : book.readingHistory.sort((a, b) => new Date(b.date) - new Date(a.date)).find(entry => entry.date < date)?.totalPages || 0;
             document.getElementById('edit-pages-read').value = currentEntry;
             document.getElementById('edit-history-modal').classList.remove('hidden');
@@ -689,7 +689,7 @@
             const currentPageTotal = parseInt(document.getElementById('edit-pages-read').value);
             if (isNaN(currentPageTotal)) return;
 
-            const bookTitle = document.getElementById('edit-book-title').textContent;
+            const bookTitle = document.getElementById('edit-history-book-title').textContent;
             const book = books.find(b => b.title === bookTitle);
 
             if (!book) return;
