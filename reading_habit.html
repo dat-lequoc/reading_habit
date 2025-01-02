@@ -97,7 +97,10 @@
     <h1 class="text-xl font-bold">Reading Habit Tracker</h1>
   </header>
   <main class="grid gap-6">
-    <div id="add-book-modal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden z-50">
+    <div
+      id="add-book-modal"
+      class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden z-50"
+    >
       <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-lg font-semibold">Add New Book</h2>
@@ -199,9 +202,7 @@
     role="dialog"
     aria-modal="true"
   >
-    <div
-      class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0"
-    >
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
       <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
       <span class="hidden sm:inline-block sm:align-middle sm:h-screen"></span>
       <div
@@ -291,9 +292,7 @@
           />
         </div>
         <div>
-          <label for="edit-total-pages" class="block text-sm font-medium text-gray-700"
-            >Total Pages</label
-          >
+          <label for="edit-total-pages" class="block text-sm font-medium text-gray-700">Total Pages</label>
           <input
             type="number"
             id="edit-total-pages"
@@ -315,7 +314,13 @@
               />
             </div>
             <div>
-              <input type="radio" id="edit-goal-pages" name="edit-goal-type" value="pages" class="mr-1" />
+              <input
+                type="radio"
+                id="edit-goal-pages"
+                name="edit-goal-type"
+                value="pages"
+                class="mr-1"
+              />
               <label for="edit-goal-pages" class="text-sm">Pages/Day</label>
               <input
                 type="number"
@@ -354,14 +359,21 @@
     </div>
   </div>
   <script>
+    const LOCAL_STORAGE_KEY = 'readingTrackerBooks';
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const dayIcons = ["☀️", "🌙", "⚡", "💧", "🔥", "🌟", "🌍"];
+
+    const $ = (id) => document.getElementById(id);
+    const formatDate = (date) => {
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
     const Utils = {
-      formatDate(date) {
-        const d = new Date(date);
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${year}-${month}-${day}`;
-      },
+      formatDate,
       getDaysBetween(start, end) {
         const startDate = new Date(start);
         const endDate = new Date(end);
@@ -373,8 +385,9 @@
       },
       calculateDailyGoal(remainingPages, remainingDays) {
         return remainingDays > 0 ? Math.ceil(remainingPages / remainingDays) : remainingPages;
-      },
+      }
     };
+
     class Book {
       constructor(data) {
         this.title = data.title;
@@ -386,16 +399,16 @@
         this.pagesPerDay = data.pagesPerDay;
         this.readingHistory = data.readingHistory || [];
       }
+
       updateProgress(currentPageTotal, date) {
         if (currentPageTotal < 0 || currentPageTotal > this.totalPages) {
           throw new Error("Invalid page number");
         }
         const existingEntryIndex = this.readingHistory.findIndex((item) => item.date === date);
-        const previousTotal =
-          this.readingHistory
-            .sort((a, b) => new Date(b.date) - new Date(a.date))
-            .find((entry) => entry.date < date)?.totalPages || 0;
+        const sortedHistory = [...this.readingHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const previousTotal = sortedHistory.find((entry) => entry.date < date)?.totalPages || 0;
         const pagesReadToday = currentPageTotal - previousTotal;
+
         if (existingEntryIndex > -1) {
           if (currentPageTotal === 0) {
             this.readingHistory.splice(existingEntryIndex, 1);
@@ -403,73 +416,86 @@
             this.readingHistory[existingEntryIndex] = {
               date,
               pagesRead: Math.max(0, pagesReadToday),
-              totalPages: currentPageTotal,
+              totalPages: currentPageTotal
             };
           }
         } else if (currentPageTotal > 0) {
           this.readingHistory.push({
             date,
             pagesRead: Math.max(0, pagesReadToday),
-            totalPages: currentPageTotal,
+            totalPages: currentPageTotal
           });
         }
         this.currentPage = currentPageTotal;
       }
+
       getProgress() {
+        const percentage = Utils.calculateProgressPercentage(this.currentPage, this.totalPages);
         return {
-          percentage: Utils.calculateProgressPercentage(this.currentPage, this.totalPages),
+          percentage,
           isCompleted: this.currentPage === this.totalPages,
           currentPage: this.currentPage,
-          totalPages: this.totalPages,
+          totalPages: this.totalPages
         };
       }
+
       getDailyGoal(currentDate) {
         const pagesRemaining = this.totalPages - this.currentPage;
-        if (this.goalType === "pages") {
-          return this.pagesPerDay;
-        } else if (this.goalType === "date" && this.targetDate) {
+        if (this.goalType === "pages") return this.pagesPerDay;
+        if (this.goalType === "date" && this.targetDate) {
           const remainingDays = Utils.getDaysBetween(currentDate, this.targetDate);
           return Utils.calculateDailyGoal(pagesRemaining, remainingDays);
         }
         return 0;
       }
     }
+
     class BookManager {
       constructor() {
         this.books = [];
+        this.$bookEntries = $("book-entries");
         this.loadBooks();
       }
+
       init() {
         this.setupEventListeners();
         this.updateUI();
       }
+
       loadBooks() {
         try {
-          const savedBooks = JSON.parse(localStorage.getItem("readingTrackerBooks")) || [];
-          this.books = savedBooks.map((bookData) => new Book(bookData));
-        } catch (error) {
+          const savedBooks = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)) || [];
+          this.books = savedBooks.map((b) => new Book(b));
+        } catch {
           this.books = [];
         }
       }
+
       saveBooks() {
-        localStorage.setItem("readingTrackerBooks", JSON.stringify(this.books));
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(this.books));
       }
+
       refreshUI() {
         this.saveBooks();
         this.updateUI();
       }
+
       addBook(bookData) {
         this.books.push(new Book(bookData));
         this.refreshUI();
       }
+
       updateBook(index, bookData) {
-        this.books[index] = new Book({ ...this.books[index], ...bookData });
+        const original = this.books[index];
+        this.books[index] = new Book({ ...original, ...bookData, readingHistory: original.readingHistory });
         this.refreshUI();
       }
+
       deleteBook(index) {
         this.books.splice(index, 1);
         this.refreshUI();
       }
+
       updateProgress(bookIndex, currentPageTotal, date) {
         try {
           this.books[bookIndex].updateProgress(currentPageTotal, date);
@@ -478,25 +504,26 @@
           alert(error.message);
         }
       }
+
       updateUI() {
         this.displayBooks();
         this.renderReadingHistoryHeatmap();
         this.calculateStats();
       }
+
       displayBooks() {
-        const today = Utils.formatDate(new Date());
-        const bookEntries = document.getElementById("book-entries");
-        if (!bookEntries) return;
+        if (!this.$bookEntries) return;
         if (this.books.length === 0) {
-          bookEntries.innerHTML = `
+          this.$bookEntries.innerHTML = `
             <div class="text-center text-gray-500 py-4">
               No books added yet. Click the + button to add your first book!
             </div>
           `;
           return;
         }
+        const today = formatDate(new Date());
         try {
-          bookEntries.innerHTML = this.books
+          this.$bookEntries.innerHTML = this.books
             .map((book, index) => {
               const progress = book.getProgress();
               const dailyGoal = book.getDailyGoal(today);
@@ -510,11 +537,7 @@
                   <div class="flex justify-between items-center cursor-pointer book-header" data-index="${index}">
                     <h4 class="text-lg font-semibold">${book.title}</h4>
                     <div class="flex items-center gap-2">
-                      ${
-                        progress.isCompleted
-                          ? '<span class="completed-indicator">Completed</span>'
-                          : ""
-                      }
+                      ${progress.isCompleted ? '<span class="completed-indicator">Completed</span>' : ""}
                       <button type="button" class="edit-book-btn text-blue-500 hover:text-blue-700" data-index="${index}">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -542,10 +565,9 @@
                       </div>
                       <p class="text-sm mt-1">Read: ${progress.currentPage} / ${progress.totalPages} pages</p>
                       <div class="mt-1 p-2 bg-blue-50 border border-blue-200 rounded-md">
-                        <p class="text-sm font-medium text-blue-800">Today's Goal: Page ${Math.min(
-                          book.currentPage + dailyGoal,
-                          book.totalPages
-                        )}</p>
+                        <p class="text-sm font-medium text-blue-800">
+                          Today's Goal: Page ${Math.min(book.currentPage + dailyGoal, book.totalPages)}
+                        </p>
                       </div>
                       <div class="mt-2 flex items-center space-x-2">
                         <input
@@ -570,136 +592,144 @@
               `;
             })
             .join("");
-        } catch (error) {
-          bookEntries.innerHTML = `
+        } catch {
+          this.$bookEntries.innerHTML = `
             <div class="text-center text-red-500 py-4">
               Error displaying books. Please try refreshing the page.
             </div>
           `;
         }
       }
+
       setupEventListeners() {
-        const bookEntries = document.getElementById("book-entries");
-        if (bookEntries) {
-          bookEntries.addEventListener("click", (event) => {
-            const target = event.target;
-            const bookIndex = target.closest("[data-book-index]")?.dataset.bookIndex;
-            if (!bookIndex) return;
-            if (target.matches(".book-header")) {
+        if (this.$bookEntries) {
+          this.$bookEntries.addEventListener("click", (e) => {
+            const target = e.target;
+            const container = target.closest("[data-book-index]");
+            if (!container) return;
+            const bookIndex = container.dataset.bookIndex;
+            if (target.matches(".book-header, .book-header *")) {
               this.toggleBookContent(bookIndex);
-            } else if (target.matches(".edit-book-btn") || target.closest(".edit-book-btn")) {
+            } else if (target.matches(".edit-book-btn, .edit-book-btn *")) {
               this.openEditBookModal(bookIndex);
-            } else if (target.matches(".update-progress-btn")) {
-              const input = target.parentElement.querySelector("input");
-              this.updateProgress(bookIndex, parseInt(input.value), Utils.formatDate(new Date()));
+            } else if (target.matches(".update-progress-btn, .update-progress-btn *")) {
+              const input = container.querySelector("input[type='number']");
+              this.updateProgress(bookIndex, parseInt(input.value, 10), formatDate(new Date()));
             }
           });
         }
-        const addBookForm = document.getElementById("add-book-form");
+
+        const addBookForm = $("add-book-form");
         if (addBookForm) {
           addBookForm.addEventListener("submit", (e) => this.handleAddBook(e));
         }
-        const editBookForm = document.getElementById("edit-book-form");
+
+        const editBookForm = $("edit-book-form");
         if (editBookForm) {
           editBookForm.addEventListener("submit", (e) => this.handleEditBook(e));
         }
-        const addBookBtn = document.getElementById("add-book-btn");
+
+        const addBookBtn = $("add-book-btn");
         if (addBookBtn) {
           addBookBtn.addEventListener("click", () => this.openAddBookModal());
         }
+
         document.querySelectorAll(".modal-close").forEach((btn) => {
           btn.addEventListener("click", () => this.closeAllModals());
         });
+
         document.querySelectorAll('input[name="goal-type"]').forEach((radio) => {
           radio.addEventListener("change", () => this.handleGoalTypeChange(radio));
         });
         document.querySelectorAll('input[name="edit-goal-type"]').forEach((radio) => {
           radio.addEventListener("change", () => this.handleGoalTypeChange(radio, true));
         });
-        const deleteBookBtn = document.getElementById("delete-book-btn");
-        if (deleteBookBtn) {
-          deleteBookBtn.addEventListener("click", () => this.handleDeleteBook());
-        }
-        const saveEditHistoryBtn = document.getElementById("save-edit-history");
+
+        const saveEditHistoryBtn = $("save-edit-history");
         if (saveEditHistoryBtn) {
           saveEditHistoryBtn.addEventListener("click", () => this.handleEditHistory());
         }
-        const exportDataBtn = document.getElementById("export-data");
+
+        const exportDataBtn = $("export-data");
         if (exportDataBtn) {
           exportDataBtn.addEventListener("click", () => this.exportData());
         }
-        const importDataBtn = document.getElementById("import-data-button");
-        const importDataInput = document.getElementById("import-data");
+
+        const importDataBtn = $("import-data-button");
+        const importDataInput = $("import-data");
         if (importDataBtn && importDataInput) {
-          importDataBtn.addEventListener("click", () => {
-            importDataInput.click();
-          });
+          importDataBtn.addEventListener("click", () => importDataInput.click());
           importDataInput.addEventListener("change", (e) => this.handleImport(e));
         }
       }
+
       toggleBookContent(index) {
-        const content = document.getElementById(`book-content-${index}`);
-        content.classList.toggle("collapsed");
+        const content = $(`book-content-${index}`);
+        if (content) content.classList.toggle("collapsed");
       }
+
       openAddBookModal() {
-        document.getElementById("add-book-modal").classList.remove("hidden");
-        document.getElementById("start-date").value = Utils.formatDate(new Date());
+        $("add-book-modal").classList.remove("hidden");
+        $("start-date").value = formatDate(new Date());
       }
+
       closeAddBookModal() {
-        document.getElementById("add-book-modal").classList.add("hidden");
-        document.getElementById("add-book-form").reset();
+        $("add-book-modal").classList.add("hidden");
+        $("add-book-form").reset();
       }
+
       openEditBookModal(bookIndex) {
         const book = this.books[bookIndex];
-        document.getElementById("edit-book-index").value = bookIndex;
-        document.getElementById("edit-book-title").value = book.title;
-        document.getElementById("edit-total-pages").value = book.totalPages;
-        document.getElementById("edit-start-date").value = book.startDate;
-        document.getElementById("edit-goal-date").checked = book.goalType === "date";
-        document.getElementById("edit-goal-pages").checked = book.goalType === "pages";
-        document.getElementById("edit-target-date").value =
-          book.goalType === "date" ? book.targetDate : "";
-        document.getElementById("edit-pages-per-day").value =
-          book.goalType === "pages" ? book.pagesPerDay : "";
-        document.getElementById("edit-target-date").disabled = book.goalType !== "date";
-        document.getElementById("edit-pages-per-day").disabled = book.goalType !== "pages";
-        document.getElementById("edit-book-modal").classList.remove("hidden");
+        $("edit-book-index").value = bookIndex;
+        $("edit-book-title").value = book.title;
+        $("edit-total-pages").value = book.totalPages;
+        $("edit-start-date").value = book.startDate;
+        $("edit-goal-date").checked = book.goalType === "date";
+        $("edit-goal-pages").checked = book.goalType === "pages";
+        $("edit-target-date").value = book.goalType === "date" ? book.targetDate : "";
+        $("edit-pages-per-day").value = book.goalType === "pages" ? book.pagesPerDay : "";
+        $("edit-target-date").disabled = book.goalType !== "date";
+        $("edit-pages-per-day").disabled = book.goalType !== "pages";
+        $("edit-book-modal").classList.remove("hidden");
       }
+
       closeEditBookModal() {
-        document.getElementById("edit-book-modal").classList.add("hidden");
+        $("edit-book-modal").classList.add("hidden");
       }
+
       openEditModal(date, bookTitle) {
         const book = this.books.find((b) => b.title === bookTitle);
         if (!book) return;
         const history = book.readingHistory.find((h) => h.date === date);
-        document.getElementById("edit-date").textContent = date;
-        document.getElementById("edit-history-book-title").textContent = bookTitle;
-        const currentEntry =
-          history?.totalPages ||
-          book.readingHistory
-            .sort((a, b) => new Date(b.date) - new Date(a.date))
-            .find((entry) => entry.date < date)?.totalPages ||
-          0;
-        document.getElementById("edit-pages-read").value = currentEntry;
-        document.getElementById("edit-history-modal").classList.remove("hidden");
+        $("edit-date").textContent = date;
+        $("edit-history-book-title").textContent = bookTitle;
+        const sortedHistory = [...book.readingHistory].sort(
+          (a, b) => new Date(b.date) - new Date(a.date)
+        );
+        const currentEntry = history?.totalPages || sortedHistory.find((entry) => entry.date < date)?.totalPages || 0;
+        $("edit-pages-read").value = currentEntry;
+        $("edit-history-modal").classList.remove("hidden");
       }
+
       closeEditModal() {
-        document.getElementById("edit-history-modal").classList.add("hidden");
+        $("edit-history-modal").classList.add("hidden");
       }
+
       closeAllModals() {
         this.closeAddBookModal();
         this.closeEditBookModal();
         this.closeEditModal();
       }
+
       handleAddBook(event) {
         event.preventDefault();
         const formData = {
-          title: document.getElementById("book-title").value,
-          totalPages: parseInt(document.getElementById("total-pages").value),
-          startDate: document.getElementById("start-date").value,
+          title: $("book-title").value,
+          totalPages: parseInt($("total-pages").value, 10),
+          startDate: $("start-date").value,
           goalType: document.querySelector('input[name="goal-type"]:checked')?.value,
-          targetDate: document.getElementById("target-date").value,
-          pagesPerDay: parseInt(document.getElementById("pages-per-day").value),
+          targetDate: $("target-date").value,
+          pagesPerDay: parseInt($("pages-per-day").value, 10)
         };
         if (!this.validateBookData(formData)) {
           alert("Please fill in all required fields with valid values.");
@@ -708,16 +738,17 @@
         this.addBook(formData);
         this.closeAddBookModal();
       }
+
       handleEditBook(event) {
         event.preventDefault();
-        const bookIndex = parseInt(document.getElementById("edit-book-index").value);
+        const bookIndex = parseInt($("edit-book-index").value, 10);
         const formData = {
-          title: document.getElementById("edit-book-title").value,
-          totalPages: parseInt(document.getElementById("edit-total-pages").value),
-          startDate: document.getElementById("edit-start-date").value,
+          title: $("edit-book-title").value,
+          totalPages: parseInt($("edit-total-pages").value, 10),
+          startDate: $("edit-start-date").value,
           goalType: document.querySelector('input[name="edit-goal-type"]:checked')?.value,
-          targetDate: document.getElementById("edit-target-date").value,
-          pagesPerDay: parseInt(document.getElementById("edit-pages-per-day").value),
+          targetDate: $("edit-target-date").value,
+          pagesPerDay: parseInt($("edit-pages-per-day").value, 10)
         };
         if (!this.validateBookData(formData)) {
           alert("Please fill in all required fields with valid values.");
@@ -726,6 +757,7 @@
         this.updateBook(bookIndex, formData);
         this.closeEditBookModal();
       }
+
       validateBookData(data) {
         return (
           data.title &&
@@ -737,21 +769,23 @@
             (data.goalType === "pages" && !isNaN(data.pagesPerDay) && data.pagesPerDay > 0))
         );
       }
+
       handleDeleteBook() {
-        const bookIndex = parseInt(document.getElementById("edit-book-index").value);
+        const bookIndex = parseInt($("edit-book-index").value, 10);
         if (confirm("Are you sure you want to delete this book? This action cannot be undone.")) {
           this.deleteBook(bookIndex);
           this.closeEditBookModal();
         }
       }
+
       handleEditHistory() {
-        const currentPageTotal = parseInt(document.getElementById("edit-pages-read").value);
+        const currentPageTotal = parseInt($("edit-pages-read").value, 10);
         if (isNaN(currentPageTotal)) return;
-        const bookTitle = document.getElementById("edit-history-book-title").textContent;
+        const bookTitle = $("edit-history-book-title").textContent;
         const book = this.books.find((b) => b.title === bookTitle);
         if (!book) return;
         try {
-          book.updateProgress(currentPageTotal, document.getElementById("edit-date").textContent);
+          book.updateProgress(currentPageTotal, $("edit-date").textContent);
           this.saveBooks();
           this.updateUI();
           this.closeEditModal();
@@ -759,23 +793,27 @@
           alert(error.message);
         }
       }
+
       handleGoalTypeChange(radio, isEdit = false) {
         const prefix = isEdit ? "edit-" : "";
         const isDateGoal = radio.value === "date";
-        document.getElementById(`${prefix}target-date`).disabled = !isDateGoal;
-        document.getElementById(`${prefix}pages-per-day`).disabled = isDateGoal;
-        if (!isDateGoal) document.getElementById(`${prefix}target-date`).value = "";
-        if (isDateGoal) document.getElementById(`${prefix}pages-per-day`).value = "";
+        $(`${prefix}target-date`).disabled = !isDateGoal;
+        $(`${prefix}pages-per-day`).disabled = isDateGoal;
+        if (!isDateGoal) $(prefix + "target-date").value = "";
+        if (isDateGoal) $(prefix + "pages-per-day").value = "";
       }
+
       calculateStats() {
         this.calculateStreaks();
         this.calculateWeeklyCompletionRate();
         this.calculateStatistics();
       }
+
       calculateStreaks() {
-        const sortedHistory = [];
-        this.books.forEach((book) => book.readingHistory.forEach((h) => sortedHistory.push(h)));
-        sortedHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
+        const allHistory = [];
+        this.books.forEach((b) => b.readingHistory.forEach((h) => allHistory.push(h)));
+        allHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
+
         let currentStreak = 0;
         let longestStreak = 0;
         let tempStreak = 0;
@@ -783,7 +821,8 @@
         const today = new Date();
         const yesterday = new Date(today);
         yesterday.setDate(today.getDate() - 1);
-        sortedHistory.forEach((item) => {
+
+        allHistory.forEach((item) => {
           const currentDate = new Date(item.date);
           if (lastDate) {
             const diffDays = Utils.getDaysBetween(currentDate, lastDate);
@@ -793,16 +832,17 @@
               longestStreak = Math.max(longestStreak, tempStreak);
               tempStreak = 1;
             }
-          } else if (Utils.formatDate(currentDate) === Utils.formatDate(yesterday)) {
+          } else if (formatDate(currentDate) === formatDate(yesterday)) {
             tempStreak = 1;
           }
           lastDate = currentDate;
         });
         longestStreak = Math.max(longestStreak, tempStreak);
+
         currentStreak = 0;
         lastDate = new Date();
-        for (let i = 0; i < sortedHistory.length; i++) {
-          const historyItemDate = new Date(sortedHistory[sortedHistory.length - 1 - i].date);
+        for (let i = 0; i < allHistory.length; i++) {
+          const historyItemDate = new Date(allHistory[allHistory.length - 1 - i].date);
           const diffDays = Utils.getDaysBetween(lastDate, historyItemDate);
           if (diffDays <= 1) {
             currentStreak++;
@@ -811,31 +851,31 @@
             break;
           }
         }
-        document.getElementById("current-streak").textContent = currentStreak;
-        document.getElementById("longest-streak").textContent = longestStreak;
+        $("current-streak").textContent = currentStreak;
+        $("longest-streak").textContent = longestStreak;
       }
+
       calculateWeeklyCompletionRate() {
         const today = new Date();
         let readingDays = 0;
         for (let i = 0; i < 7; i++) {
           const date = new Date(today);
           date.setDate(today.getDate() - i);
-          const formattedDate = Utils.formatDate(date);
+          const formattedDate = formatDate(date);
           const hasRead = this.books.some((book) =>
             book.readingHistory.some((item) => item.date === formattedDate && item.pagesRead > 0)
           );
           if (hasRead) readingDays++;
         }
         const completionRate = Math.round((readingDays / 7) * 100);
-        document.getElementById("weekly-completion").textContent = `${completionRate}%`;
+        $("weekly-completion").textContent = `${completionRate}%`;
       }
+
       calculateStatistics() {
         const stats = this.books.reduce(
           (acc, book) => {
             acc.totalPagesRead += book.currentPage;
-            if (book.currentPage === book.totalPages) {
-              acc.totalBooksCompleted++;
-            }
+            if (book.currentPage === book.totalPages) acc.totalBooksCompleted++;
             book.readingHistory.forEach((item) => {
               acc.totalReadingDays++;
               const dayOfWeek = new Date(item.date).getDay();
@@ -847,36 +887,40 @@
             totalPagesRead: 0,
             totalBooksCompleted: 0,
             totalReadingDays: 0,
-            dayCounts: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+            dayCounts: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
           }
         );
-        const averagePages =
-          stats.totalReadingDays > 0
-            ? Math.round(stats.totalPagesRead / stats.totalReadingDays)
-            : 0;
+
+        const averagePages = stats.totalReadingDays
+          ? Math.round(stats.totalPagesRead / stats.totalReadingDays)
+          : 0;
         let bestDay = "";
         let maxPages = 0;
-        const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
         Object.entries(stats.dayCounts).forEach(([day, pages]) => {
           if (pages > maxPages) {
             maxPages = pages;
-            bestDay = dayNames[parseInt(day)];
+            bestDay = dayNames[parseInt(day, 10)];
           }
         });
-        document.getElementById("avg-pages").textContent = averagePages;
-        document.getElementById("total-books-completed").textContent = stats.totalBooksCompleted;
-        document.getElementById("total-pages-read").textContent = stats.totalPagesRead;
-        document.getElementById("best-day").textContent = bestDay;
+
+        $("avg-pages").textContent = averagePages;
+        $("total-books-completed").textContent = stats.totalBooksCompleted;
+        $("total-pages-read").textContent = stats.totalPagesRead;
+        $("best-day").textContent = bestDay;
       }
+
       renderReadingHistoryHeatmap() {
-        const heatmapContainer = document.getElementById("heatmap-container");
+        const heatmapContainer = $("heatmap-container");
+        if (!heatmapContainer) return;
         heatmapContainer.innerHTML = "";
+
         const today = new Date();
         const dates = Array.from({ length: 7 }, (_, i) => {
           const date = new Date(today);
           date.setDate(today.getDate() - (6 - i));
-          return Utils.formatDate(date);
+          return formatDate(date);
         });
+
         const headerRow = document.createElement("div");
         headerRow.className = "grid grid-cols-[100px_1fr] items-start mb-2";
         headerRow.innerHTML = `
@@ -884,13 +928,11 @@
           <div class="grid grid-cols-7 gap-2 text-center text-sm font-medium text-gray-600">
             ${dates
               .map((date) => {
-                const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-                const dayIcons = ["☀️", "🌙", "⚡", "💧", "🔥", "🌟", "🌍"];
-                const dayIndex = new Date(date).getDay();
+                const d = new Date(date).getDay();
                 return `
                   <div class="flex items-center justify-center gap-1">
-                    <span>${dayIcons[dayIndex]}</span>
-                    <span>${dayNames[dayIndex]}</span>
+                    <span>${dayIcons[d]}</span>
+                    <span>${dayNames[d].slice(0, 3)}</span>
                   </div>
                 `;
               })
@@ -898,6 +940,7 @@
           </div>
         `;
         heatmapContainer.appendChild(headerRow);
+
         this.books.forEach((book) => {
           const bookRow = document.createElement("div");
           bookRow.className = "heatmap-book-row";
@@ -905,8 +948,10 @@
           label.className = "book-label";
           label.textContent = book.title;
           bookRow.appendChild(label);
+
           const heatmapRow = document.createElement("div");
           heatmapRow.className = "heatmap-row";
+
           dates.forEach((date) => {
             const cell = document.createElement("div");
             cell.className = "heatmap-cell";
@@ -918,8 +963,7 @@
             const dailyGoal = book.getDailyGoal(date);
             const intensity = Math.min(pagesRead / 50, 1);
             const cellDate = new Date(date);
-            const isInPast =
-              cellDate < today && Utils.formatDate(cellDate) !== Utils.formatDate(today);
+            const isInPast = cellDate < today && formatDate(cellDate) !== formatDate(today);
             const color =
               isInPast && pagesRead < dailyGoal
                 ? `rgba(239, 68, 68, ${intensity})`
@@ -927,7 +971,7 @@
             cell.style.backgroundColor = color;
             cell.innerHTML = `
               <div class="text-xs font-medium ${intensity > 0.5 ? "text-white" : "text-gray-700"}">
-                ${new Date(date).getDate()}
+                ${cellDate.getDate()}
               </div>
               <div class="text-xs ${intensity > 0.5 ? "text-white" : "text-gray-700"}">
                 ${pagesRead > 0 ? "At page " + totalPages : "No reading"}
@@ -937,25 +981,31 @@
             this.addCellTooltip(cell, book.title, pagesRead, date);
             heatmapRow.appendChild(cell);
           });
+
           bookRow.appendChild(heatmapRow);
           heatmapContainer.appendChild(bookRow);
         });
       }
+
       addCellTooltip(cell, bookTitle, pagesRead, date) {
-        cell.addEventListener("mouseover", (event) => {
+        cell.addEventListener("mouseover", (e) => {
           const tooltip = document.createElement("div");
           tooltip.textContent = `${bookTitle}: ${pagesRead} pages on ${date}`;
           tooltip.className = "absolute bg-black text-white p-2 rounded text-xs z-10";
-          tooltip.style.top = `${event.clientY - 30}px`;
-          tooltip.style.left = `${event.clientX + 10}px`;
+          tooltip.style.top = `${e.clientY - 30}px`;
+          tooltip.style.left = `${e.clientX + 10}px`;
           document.body.appendChild(tooltip);
+
           const removeTooltip = () => {
-            document.body.removeChild(tooltip);
+            if (document.body.contains(tooltip)) {
+              document.body.removeChild(tooltip);
+            }
             cell.removeEventListener("mouseout", removeTooltip);
           };
           cell.addEventListener("mouseout", removeTooltip);
         });
       }
+
       exportData() {
         const dataStr = JSON.stringify(this.books);
         const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
@@ -965,6 +1015,7 @@
         linkElement.setAttribute("download", exportFileDefaultName);
         linkElement.click();
       }
+
       handleImport(event) {
         const file = event.target.files[0];
         if (!file) return;
@@ -974,7 +1025,7 @@
             const importedData = JSON.parse(e.target.result);
             if (Array.isArray(importedData)) {
               if (confirm("This will replace your current data. Are you sure you want to continue?")) {
-                this.books = importedData.map((bookData) => new Book(bookData));
+                this.books = importedData.map((d) => new Book(d));
                 this.saveBooks();
                 this.updateUI();
                 alert("Data imported successfully!");
@@ -982,7 +1033,7 @@
             } else {
               throw new Error("Invalid data format");
             }
-          } catch (error) {
+          } catch {
             alert(
               "Error: Invalid file format. Please make sure you are importing a valid reading tracker data file."
             );
@@ -992,26 +1043,29 @@
         event.target.value = "";
       }
     }
+
     let bookManager;
+
     function initializeApp() {
       try {
         bookManager = new BookManager();
         window.bookManager = bookManager;
         bookManager.init();
-      } catch (error) {}
+      } catch {}
     }
+
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", initializeApp);
     } else {
       setTimeout(initializeApp, 0);
     }
+
     window.addEventListener("load", () => {
-      if (!bookManager) {
-        initializeApp();
-      }
+      if (!bookManager) initializeApp();
     });
+
     function closeEditBookModal() {
-      document.getElementById("edit-book-modal").classList.add("hidden");
+      $("edit-book-modal").classList.add("hidden");
     }
   </script>
 </body>
