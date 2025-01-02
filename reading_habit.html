@@ -176,30 +176,15 @@
   </main>
   <section id="stats-history" class="bg-white p-4 rounded shadow mt-6 md:mt-0">
     <div id="weekly-heatmap" class="mb-6">
-      <h2 class="text-lg font-bold mb-4">This Week's Reading Activity</h2>
+      <h2 class="text-lg font-bold mb-4">This Week</h2>
       <div id="heatmap-container"></div>
-    </div>
-    <div class="grid grid-cols-2 gap-4 text-sm">
-      <div id="streaks">
-        <h3 class="font-semibold mb-1">Streaks</h3>
-        <p>Current: <span id="current-streak" class="font-medium">0</span> days</p>
-        <p>Longest: <span id="longest-streak" class="font-medium">0</span> days</p>
-        <p>Weekly Completion: <span id="weekly-completion" class="font-medium">0%</span></p>
-      </div>
-      <div id="historical-stats">
-        <h3 class="font-semibold mb-1">Statistics</h3>
-        <p>Avg Pages/Day: <span id="avg-pages" class="font-medium">0</span></p>
-        <p>Books Completed: <span id="total-books-completed" class="font-medium">0</span></p>
-        <p>Total Pages Read: <span id="total-pages-read" class="font-medium">0</span></p>
-        <p>Best Reading Day: <span id="best-day" class="font-medium"></span></p>
-      </div>
     </div>
   </section>
 
   <!-- New Reading Challenge Section -->
   <section id="reading-challenge" class="bg-white p-4 rounded shadow mt-6">
     <div class="flex justify-between items-center mb-4">
-      <h2 class="text-lg font-bold">Yearly Reading Challenge</h2>
+      <h2 class="text-lg font-bold">Reading Challenge <span id="challenge-year"></span></h2>
       <button
         id="edit-goal-btn"
         class="text-blue-500 hover:text-blue-700 flex items-center gap-1"
@@ -335,6 +320,24 @@
       </button>
     </div>
   </div>
+
+  <!-- Moved Streaks and Statistics Section -->
+  <section class="grid grid-cols-2 gap-4 text-sm bg-white p-4 rounded shadow mt-6">
+    <div id="streaks">
+      <h3 class="font-semibold mb-1">Streaks</h3>
+      <p>Current: <span id="current-streak" class="font-medium">0</span> days</p>
+      <p>Longest: <span id="longest-streak" class="font-medium">0</span> days</p>
+      <p>Weekly Completion: <span id="weekly-completion" class="font-medium">0%</span></p>
+    </div>
+    <div id="historical-stats">
+      <h3 class="font-semibold mb-1">Statistics</h3>
+      <p>Avg Pages/Day: <span id="avg-pages" class="font-medium">0</span></p>
+      <p>Books Completed: <span id="total-books-completed" class="font-medium">0</span></p>
+      <p>Total Pages Read: <span id="total-pages-read" class="font-medium">0</span></p>
+      <p>Best Reading Day: <span id="best-day" class="font-medium"></span></p>
+    </div>
+  </section>
+
   <div
     id="edit-book-modal"
     class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden z-50"
@@ -532,6 +535,7 @@
         this.setupEventListeners();
         this.updateUI();
         this.updateReadingChallenge();
+        document.getElementById('challenge-year').textContent = new Date().getFullYear();
       }
 
       loadBooks() {
