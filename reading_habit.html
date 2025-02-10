@@ -145,11 +145,86 @@
         touch-action: none; /* Prevent scrolling while dragging */
       }
     }
+
+    /* Toggle Switch Styles */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 3rem;
+      height: 1.5rem;
+    }
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .toggle-switch .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: #e5e7eb;
+      transition: 0.3s;
+      border-radius: 9999px;
+    }
+    .toggle-switch .slider:before {
+      position: absolute;
+      content: "";
+      height: 1.25rem;
+      width: 1.25rem;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+    .toggle-switch input:checked + .slider {
+      background-color: #3b82f6;
+    }
+    .toggle-switch input:checked + .slider:before {
+      transform: translateX(1.5rem);
+    }
+
+    /* Settings Button Styles */
+    #settings-btn {
+      width: 2.5rem;
+      height: 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #e5e7eb;
+      background-color: white;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      border-radius: 9999px;
+      transition: all 0.2s;
+      z-index: 10;
+    }
+    #settings-btn:hover {
+      background-color: #f3f4f6;
+      border-color: #d1d5db;
+      transform: scale(1.05);
+    }
+    #settings-btn:active {
+      background-color: #e5e7eb;
+      transform: scale(0.95);
+    }
+    #settings-btn svg {
+      width: 1.25rem;
+      height: 1.25rem;
+    }
   </style>
 </head>
 <body class="bg-gray-100 p-6 font-sans">
   <header class="mb-6 flex items-center justify-between">
     <h1 class="text-xl font-bold">A Year of Reading</h1>
+    <button
+      id="settings-btn"
+      aria-label="Settings"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    </button>
   </header>
   <main class="grid gap-6">
     <div
@@ -486,6 +561,36 @@
       </form>
     </div>
   </div>
+
+  <!-- Settings Modal -->
+  <div
+    id="settings-modal"
+    class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center hidden z-50"
+  >
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold">Settings</h2>
+        <button type="button" class="modal-close text-gray-500 hover:text-gray-700">×</button>
+      </div>
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <label for="hide-completed-week" class="text-sm text-gray-700">Hide completed books in weekly view</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="hide-completed-week">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="flex items-center justify-between">
+          <label for="hide-completed-books" class="text-sm text-gray-700">Hide completed books in My Books</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="hide-completed-books">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const LOCAL_STORAGE_KEY = 'readingTrackerBooks';
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -608,6 +713,10 @@
         this.yearlyGoal = parseInt(localStorage.getItem('yearlyReadingGoal')) || 52;
         this.collapsedBooks = new Set(JSON.parse(localStorage.getItem('collapsedBooks') || '[]'));
         this.bookOrder = JSON.parse(localStorage.getItem('bookOrder') || '[]');
+        this.settings = {
+          hideCompletedWeek: JSON.parse(localStorage.getItem('hideCompletedWeek') ?? 'true'),
+          hideCompletedBooks: JSON.parse(localStorage.getItem('hideCompletedBooks') ?? 'false')
+        };
         this.loadBooks();
       }
 
@@ -711,7 +820,9 @@
         const today = formatDate(new Date());
         try {
           // Sort books: completed last, then by saved order/title
-          const booksWithIndices = this.books.map((book, index) => ({ book, originalIndex: index }));
+          const booksWithIndices = this.books
+            .filter(book => !this.settings.hideCompletedBooks || book.currentPage !== book.totalPages)
+            .map((book, index) => ({ book, originalIndex: index }));
           const sortedBooks = booksWithIndices.sort((a, b) => {
             const aCompleted = a.book.currentPage === a.book.totalPages;
             const bCompleted = b.book.currentPage === b.book.totalPages;
@@ -1004,6 +1115,33 @@
           });
         }
 
+        // Settings event listeners
+        const settingsBtn = $("settings-btn");
+        if (settingsBtn) {
+          settingsBtn.addEventListener("click", () => this.openSettingsModal());
+        }
+
+        const hideCompletedWeekToggle = $("hide-completed-week");
+        const hideCompletedBooksToggle = $("hide-completed-books");
+
+        if (hideCompletedWeekToggle) {
+          hideCompletedWeekToggle.checked = this.settings.hideCompletedWeek;
+          hideCompletedWeekToggle.addEventListener("change", (e) => {
+            this.settings.hideCompletedWeek = e.target.checked;
+            this.saveSettings();
+            this.updateUI();
+          });
+        }
+
+        if (hideCompletedBooksToggle) {
+          hideCompletedBooksToggle.checked = this.settings.hideCompletedBooks;
+          hideCompletedBooksToggle.addEventListener("change", (e) => {
+            this.settings.hideCompletedBooks = e.target.checked;
+            this.saveSettings();
+            this.updateUI();
+          });
+        }
+
         const addBookForm = $("add-book-form");
         if (addBookForm) {
           addBookForm.addEventListener("submit", (e) => this.handleAddBook(e));
@@ -1127,6 +1265,7 @@
         this.closeAddBookModal();
         this.closeEditBookModal();
         this.closeEditModal();
+        this.closeSettingsModal();
       }
 
       handleAddBook(event) {
@@ -1349,7 +1488,11 @@
         `;
         heatmapContainer.appendChild(headerRow);
 
-        this.books.forEach((book) => {
+        const booksToShow = this.books.filter(book => 
+          !this.settings.hideCompletedWeek || book.currentPage !== book.totalPages
+        );
+
+        booksToShow.forEach((book) => {
           const bookRow = document.createElement("div");
           bookRow.className = "heatmap-book-row";
           const label = document.createElement("div");
@@ -1527,6 +1670,19 @@
         
         booksProgressBar.style.width = `${booksProgressPercentage}%`;
         yearProgressBar.style.width = `${yearProgressPercentage}%`;
+      }
+
+      openSettingsModal() {
+        $("settings-modal").classList.remove("hidden");
+      }
+
+      closeSettingsModal() {
+        $("settings-modal").classList.add("hidden");
+      }
+
+      saveSettings() {
+        localStorage.setItem('hideCompletedWeek', JSON.stringify(this.settings.hideCompletedWeek));
+        localStorage.setItem('hideCompletedBooks', JSON.stringify(this.settings.hideCompletedBooks));
       }
     }
 
