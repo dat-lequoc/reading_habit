@@ -564,6 +564,7 @@
         this.books = [];
         this.$bookEntries = $("book-entries");
         this.yearlyGoal = parseInt(localStorage.getItem('yearlyReadingGoal')) || 52;
+        this.collapsedBooks = new Set(JSON.parse(localStorage.getItem('collapsedBooks') || '[]'));
         this.loadBooks();
       }
 
@@ -585,6 +586,7 @@
 
       saveBooks() {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(this.books));
+        localStorage.setItem('collapsedBooks', JSON.stringify([...this.collapsedBooks]));
       }
 
       refreshUI() {
@@ -670,6 +672,7 @@
               const sortedHistory = [...book.readingHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
               const pagesAsOfYesterday = sortedHistory.find(entry => entry.date <= yesterdayStr)?.totalPages || 0;
               const targetPage = Math.min(pagesAsOfYesterday + dailyGoal, book.totalPages);
+              const isCollapsed = this.collapsedBooks.has(originalIndex.toString());
 
               return `
                 <div
@@ -695,42 +698,69 @@
                       </button>
                     </div>
                   </div>
-                  <div id="book-content-${originalIndex}" class="book-content ${progress.isCompleted ? 'collapsed' : ''} mt-4">
+                  ${!progress.isCompleted ? `
                     <div class="mt-2">
-                      <div class="flex items-center justify-between mb-1">
-                        <span class="text-sm">Progress: ${progress.percentage}%</span>
+                      <div id="collapsed-progress-${originalIndex}" class="${isCollapsed ? '' : 'hidden'}">
+                        <div class="relative h-2 rounded bg-blue-200">
+                          <div
+                            style="width:${progress.percentage}%"
+                            class="absolute h-full rounded bg-blue-500"
+                          ></div>
+                        </div>
                       </div>
-                      <div class="relative h-2 rounded bg-blue-200">
-                        <div
-                          style="width:${progress.percentage}%"
-                          class="absolute h-full rounded bg-blue-500"
-                        ></div>
-                      </div>
-                      <p class="text-sm mt-1">Read: ${progress.currentPage} / ${progress.totalPages} pages</p>
-                      <div class="mt-1 p-2 bg-blue-50 border border-blue-200 rounded-md">
-                        <p class="text-sm font-medium text-blue-800">
-                          Today's Goal: Page ${targetPage}
-                        </p>
-                      </div>
-                      <div class="mt-2 flex items-center space-x-2">
-                        <input
-                          type="number"
-                          class="p-1.5 w-full border rounded text-sm focus:ring-blue-500 focus:border-blue-500"
-                          value="${todayReading}"
-                          min="0"
-                          max="${book.totalPages}"
-                          data-book-index="${originalIndex}"
-                        />
-                        <button
-                          type="button"
-                          class="bg-blue-500 text-white py-1.5 px-3 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-xs update-progress-btn"
-                          data-book-index="${originalIndex}"
-                        >
-                          Update
-                        </button>
+                      <div id="book-content-${originalIndex}" class="book-content ${isCollapsed ? 'collapsed' : ''} mt-4">
+                        <div class="mt-2">
+                          <div class="flex items-center justify-between mb-1">
+                            <span class="text-sm">Progress: ${progress.percentage}%</span>
+                          </div>
+                          <div class="relative h-2 rounded bg-blue-200">
+                            <div
+                              style="width:${progress.percentage}%"
+                              class="absolute h-full rounded bg-blue-500"
+                            ></div>
+                          </div>
+                          <p class="text-sm mt-1">Read: ${progress.currentPage} / ${progress.totalPages} pages</p>
+                          <div class="mt-1 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                            <p class="text-sm font-medium text-blue-800">
+                              Today's Goal: Page ${targetPage}
+                            </p>
+                          </div>
+                          <div class="mt-2 flex items-center space-x-2">
+                            <input
+                              type="number"
+                              class="p-1.5 w-full border rounded text-sm focus:ring-blue-500 focus:border-blue-500"
+                              value="${todayReading}"
+                              min="0"
+                              max="${book.totalPages}"
+                              data-book-index="${originalIndex}"
+                            />
+                            <button
+                              type="button"
+                              class="bg-blue-500 text-white py-1.5 px-3 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-xs update-progress-btn"
+                              data-book-index="${originalIndex}"
+                            >
+                              Update
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ` : `
+                    <div id="book-content-${originalIndex}" class="book-content collapsed mt-4">
+                      <div class="mt-2">
+                        <div class="flex items-center justify-between mb-1">
+                          <span class="text-sm">Progress: ${progress.percentage}%</span>
+                        </div>
+                        <div class="relative h-2 rounded bg-blue-200">
+                          <div
+                            style="width:${progress.percentage}%"
+                            class="absolute h-full rounded bg-blue-500"
+                          ></div>
+                        </div>
+                        <p class="text-sm mt-1">Read: ${progress.currentPage} / ${progress.totalPages} pages</p>
+                      </div>
+                    </div>
+                  `}
                 </div>
               `;
             })
@@ -825,7 +855,20 @@
 
       toggleBookContent(index) {
         const content = $(`book-content-${index}`);
-        if (content) content.classList.toggle("collapsed");
+        const collapsedProgress = $(`collapsed-progress-${index}`);
+        if (content) {
+          const isCollapsing = !content.classList.contains("collapsed");
+          content.classList.toggle("collapsed");
+          if (collapsedProgress) {
+            collapsedProgress.classList.toggle("hidden", !isCollapsing);
+          }
+          if (isCollapsing) {
+            this.collapsedBooks.add(index.toString());
+          } else {
+            this.collapsedBooks.delete(index.toString());
+          }
+          this.saveBooks();
+        }
       }
 
       openAddBookModal() {
