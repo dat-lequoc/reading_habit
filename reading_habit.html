@@ -108,8 +108,8 @@
       width: 100%;
     }
     .book-entry {
-      transition: transform 0.2s;
-      touch-action: none; /* Prevent scrolling while dragging on mobile */
+      transition: transform 0.2s, box-shadow 0.2s;
+      touch-action: none;
       position: relative;
       z-index: 1;
     }
@@ -120,9 +120,13 @@
       position: relative;
       z-index: 10;
       transform: scale(1.02);
+      transition: none; /* Disable transition during drag */
     }
     .book-entry.drag-over {
       transform: translateY(10px);
+    }
+    .book-entry.releasing {
+      transition: all 0.2s ease-out;
     }
     .drag-handle {
       cursor: grab;
@@ -848,6 +852,7 @@
           let initialY = 0;
           let currentY = 0;
           let yOffset = 0;
+          let lastKnownPosition = null;
 
           const getDragTarget = (element) => {
             return element.closest(".book-entry") || element;
@@ -860,8 +865,10 @@
             // Calculate initial position
             if (e.type === "mousedown") {
               initialY = e.clientY - yOffset;
+              lastKnownPosition = { x: e.clientX, y: e.clientY };
             } else if (e.type === "touchstart") {
               initialY = e.touches[0].clientY - yOffset;
+              lastKnownPosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
             }
             
             // Set initial transform
@@ -875,15 +882,17 @@
             // Calculate current position
             if (e.type === "mousemove") {
               currentY = e.clientY - initialY;
+              lastKnownPosition = { x: e.clientX, y: e.clientY };
             } else if (e.type === "touchmove") {
               currentY = e.touches[0].clientY - initialY;
+              lastKnownPosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
             }
 
             yOffset = currentY;
             draggedElement.style.transform = `translateY(${currentY}px)`;
 
             // Find and highlight drop target
-            const dropTarget = findDropTarget(e);
+            const dropTarget = findDropTarget(lastKnownPosition);
             if (dropTarget && dropTarget !== draggedElement) {
               document.querySelectorAll(".book-entry").forEach(entry => {
                 entry.classList.remove("drag-over");
@@ -895,7 +904,14 @@
           const endDragging = (e) => {
             if (!draggedElement) return;
 
-            const dropTarget = findDropTarget(e);
+            if (e.type === "touchend" && e.changedTouches && e.changedTouches.length > 0) {
+              lastKnownPosition = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+            }
+
+            // Add releasing class for smooth animation back
+            draggedElement.classList.add("releasing");
+            
+            const dropTarget = findDropTarget(lastKnownPosition);
             if (dropTarget && dropTarget !== draggedElement) {
               // Get the indices and reorder
               const draggedTitle = draggedElement.dataset.bookTitle;
@@ -908,25 +924,35 @@
               this.books.splice(dropTargetIndex, 0, draggedBook);
               
               this.refreshUI();
+            } else {
+              // If no valid drop target, animate back to original position
+              draggedElement.style.transform = "";
             }
 
-            // Reset the dragged element
-            draggedElement.style.transform = "";
+            // Clean up
             draggedElement.classList.remove("dragging");
             document.querySelectorAll(".book-entry").forEach(entry => {
               entry.classList.remove("drag-over");
             });
+
+            // Remove the releasing class after animation
+            setTimeout(() => {
+              if (draggedElement) {
+                draggedElement.classList.remove("releasing");
+              }
+            }, 200);
+
+            // Reset variables
             draggedElement = null;
             initialY = 0;
             currentY = 0;
             yOffset = 0;
+            lastKnownPosition = null;
           };
 
-          const findDropTarget = (e) => {
-            const elements = document.elementsFromPoint(
-              e.type.includes('touch') ? e.touches[0].clientX : e.clientX,
-              e.type.includes('touch') ? e.touches[0].clientY : e.clientY
-            );
+          const findDropTarget = (position) => {
+            if (!position) return null;
+            const elements = document.elementsFromPoint(position.x, position.y);
             return elements.find(el => el.classList.contains('book-entry') && el !== draggedElement);
           };
 
