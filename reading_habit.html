@@ -66,6 +66,10 @@
       height: 100%;
       min-width: 80px;
       max-width: 100px;
+      cursor: grab;
+    }
+    .book-label:active {
+      cursor: grabbing;
     }
     .completed-book {
       border-left: 4px solid #10B981;
@@ -102,6 +106,40 @@
       gap: 0.25rem;
       margin: 0.25rem 0;
       width: 100%;
+    }
+    .book-entry {
+      transition: transform 0.2s;
+      touch-action: none; /* Prevent scrolling while dragging on mobile */
+      position: relative;
+      z-index: 1;
+    }
+    .book-entry.dragging {
+      opacity: 0.9;
+      background: #f3f4f6;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      position: relative;
+      z-index: 10;
+      transform: scale(1.02);
+    }
+    .book-entry.drag-over {
+      transform: translateY(10px);
+    }
+    .drag-handle {
+      cursor: grab;
+      padding: 8px;
+      margin: -8px;
+      touch-action: none;
+    }
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+    @media (hover: none) {
+      .book-entry {
+        touch-action: pan-y; /* Allow vertical scrolling by default */
+      }
+      .book-entry.dragging {
+        touch-action: none; /* Prevent scrolling while dragging */
+      }
     }
   </style>
 </head>
@@ -565,6 +603,7 @@
         this.$bookEntries = $("book-entries");
         this.yearlyGoal = parseInt(localStorage.getItem('yearlyReadingGoal')) || 52;
         this.collapsedBooks = new Set(JSON.parse(localStorage.getItem('collapsedBooks') || '[]'));
+        this.bookOrder = JSON.parse(localStorage.getItem('bookOrder') || '[]');
         this.loadBooks();
       }
 
@@ -579,6 +618,25 @@
         try {
           const savedBooks = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)) || [];
           this.books = savedBooks.map((b) => new Book(b));
+          
+          // Apply saved order if it exists
+          if (this.bookOrder.length > 0) {
+            const orderedBooks = [];
+            const bookMap = new Map(this.books.map(book => [book.title, book]));
+            
+            // First add books in the saved order
+            this.bookOrder.forEach(title => {
+              if (bookMap.has(title)) {
+                orderedBooks.push(bookMap.get(title));
+                bookMap.delete(title);
+              }
+            });
+            
+            // Then add any new books that weren't in the saved order
+            bookMap.forEach(book => orderedBooks.push(book));
+            
+            this.books = orderedBooks;
+          }
         } catch {
           this.books = [];
         }
@@ -587,6 +645,7 @@
       saveBooks() {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(this.books));
         localStorage.setItem('collapsedBooks', JSON.stringify([...this.collapsedBooks]));
+        localStorage.setItem('bookOrder', JSON.stringify(this.books.map(book => book.title)));
       }
 
       refreshUI() {
@@ -647,13 +706,13 @@
         }
         const today = formatDate(new Date());
         try {
-          // Sort books: completed first, then by title, but keep track of original indices
+          // Sort books: completed last, then by saved order/title
           const booksWithIndices = this.books.map((book, index) => ({ book, originalIndex: index }));
           const sortedBooks = booksWithIndices.sort((a, b) => {
             const aCompleted = a.book.currentPage === a.book.totalPages;
             const bCompleted = b.book.currentPage === b.book.totalPages;
             if (aCompleted === bCompleted) {
-              return a.book.title.localeCompare(b.book.title);
+              return a.originalIndex - b.originalIndex;
             }
             return bCompleted ? 1 : -1;
           });
@@ -676,11 +735,20 @@
 
               return `
                 <div
-                  class="bg-gray-50 p-3 rounded border ${progress.isCompleted ? "completed-book" : ""} relative"
+                  class="bg-gray-50 p-3 rounded border ${progress.isCompleted ? "completed-book" : ""} relative book-entry"
                   data-book-index="${originalIndex}"
+                  data-book-title="${book.title}"
+                  draggable="true"
                 >
                   <div class="flex justify-between items-center cursor-pointer book-header" data-index="${originalIndex}">
-                    <h4 class="text-lg font-semibold truncate pr-8">${book.title}</h4>
+                    <div class="flex items-center gap-2">
+                      <button type="button" class="drag-handle text-gray-400 hover:text-gray-600" aria-label="Drag to reorder">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M7 4a1 1 0 0 1 1-1h4a1 1 0 1 1 0 2H8a1 1 0 0 1-1-1zM7 8a1 1 0 0 1 1-1h4a1 1 0 1 1 0 2H8a1 1 0 0 1-1-1zM7 12a1 1 0 0 1 1-1h4a1 1 0 1 1 0 2H8a1 1 0 0 1-1-1z"/>
+                        </svg>
+                      </button>
+                      <h4 class="text-lg font-semibold truncate pr-8">${book.title}</h4>
+                    </div>
                     <div class="flex items-center gap-2 absolute right-3 top-3">
                       ${progress.isCompleted ? '<span class="completed-indicator">Completed</span>' : 
                         (progress.currentPage > 0 ? '<span class="in-progress-indicator">In Progress</span>' : '')}
@@ -776,6 +844,117 @@
 
       setupEventListeners() {
         if (this.$bookEntries) {
+          let draggedElement = null;
+          let initialY = 0;
+          let currentY = 0;
+          let yOffset = 0;
+
+          const getDragTarget = (element) => {
+            return element.closest(".book-entry") || element;
+          };
+
+          const startDragging = (e, target) => {
+            draggedElement = target;
+            draggedElement.classList.add("dragging");
+            
+            // Calculate initial position
+            if (e.type === "mousedown") {
+              initialY = e.clientY - yOffset;
+            } else if (e.type === "touchstart") {
+              initialY = e.touches[0].clientY - yOffset;
+            }
+            
+            // Set initial transform
+            draggedElement.style.transform = `translateY(${yOffset}px)`;
+          };
+
+          const drag = (e) => {
+            if (!draggedElement) return;
+            e.preventDefault();
+
+            // Calculate current position
+            if (e.type === "mousemove") {
+              currentY = e.clientY - initialY;
+            } else if (e.type === "touchmove") {
+              currentY = e.touches[0].clientY - initialY;
+            }
+
+            yOffset = currentY;
+            draggedElement.style.transform = `translateY(${currentY}px)`;
+
+            // Find and highlight drop target
+            const dropTarget = findDropTarget(e);
+            if (dropTarget && dropTarget !== draggedElement) {
+              document.querySelectorAll(".book-entry").forEach(entry => {
+                entry.classList.remove("drag-over");
+              });
+              dropTarget.classList.add("drag-over");
+            }
+          };
+
+          const endDragging = (e) => {
+            if (!draggedElement) return;
+
+            const dropTarget = findDropTarget(e);
+            if (dropTarget && dropTarget !== draggedElement) {
+              // Get the indices and reorder
+              const draggedTitle = draggedElement.dataset.bookTitle;
+              const dropTargetTitle = dropTarget.dataset.bookTitle;
+              
+              const draggedIndex = this.books.findIndex(book => book.title === draggedTitle);
+              const dropTargetIndex = this.books.findIndex(book => book.title === dropTargetTitle);
+              
+              const [draggedBook] = this.books.splice(draggedIndex, 1);
+              this.books.splice(dropTargetIndex, 0, draggedBook);
+              
+              this.refreshUI();
+            }
+
+            // Reset the dragged element
+            draggedElement.style.transform = "";
+            draggedElement.classList.remove("dragging");
+            document.querySelectorAll(".book-entry").forEach(entry => {
+              entry.classList.remove("drag-over");
+            });
+            draggedElement = null;
+            initialY = 0;
+            currentY = 0;
+            yOffset = 0;
+          };
+
+          const findDropTarget = (e) => {
+            const elements = document.elementsFromPoint(
+              e.type.includes('touch') ? e.touches[0].clientX : e.clientX,
+              e.type.includes('touch') ? e.touches[0].clientY : e.clientY
+            );
+            return elements.find(el => el.classList.contains('book-entry') && el !== draggedElement);
+          };
+
+          // Mouse events
+          this.$bookEntries.addEventListener("mousedown", (e) => {
+            if (!e.target.closest('.drag-handle')) return;
+            const target = getDragTarget(e.target);
+            if (!target) return;
+            e.preventDefault();
+            startDragging(e, target);
+          });
+
+          document.addEventListener("mousemove", drag);
+          document.addEventListener("mouseup", endDragging);
+
+          // Touch events
+          this.$bookEntries.addEventListener("touchstart", (e) => {
+            if (!e.target.closest('.drag-handle')) return;
+            const target = getDragTarget(e.target);
+            if (!target) return;
+            startDragging(e, target);
+          }, { passive: false });
+
+          document.addEventListener("touchmove", drag, { passive: false });
+          document.addEventListener("touchend", endDragging);
+          document.addEventListener("touchcancel", endDragging);
+
+          // Click event handlers
           this.$bookEntries.addEventListener("click", (e) => {
             const target = e.target;
             const container = target.closest("[data-book-index]");
@@ -785,12 +964,12 @@
             // Check if the click is on the edit button or its SVG child
             const isEditButton = target.matches(".edit-book-btn, .edit-book-btn *, svg, path");
             if (isEditButton) {
-              e.stopPropagation(); // Prevent the click from triggering the header click
+              e.stopPropagation();
               this.openEditBookModal(bookIndex);
               return;
             }
 
-            if (target.matches(".book-header, .book-header *")) {
+            if (target.matches(".book-header, .book-header *:not(.drag-handle)")) {
               this.toggleBookContent(bookIndex);
             } else if (target.matches(".update-progress-btn, .update-progress-btn *")) {
               const input = container.querySelector("input[type='number']");
