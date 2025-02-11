@@ -382,6 +382,9 @@
         </svg>
         Adjust Date Targets
       </button>
+      <button id="update-todays-goal-btn" class="text-blue-500 hover:text-blue-700 flex items-center gap-1 ml-4">
+        Update Today's Goal
+      </button>
     </div>
     <div class="space-y-4">
       <div>
@@ -567,6 +570,15 @@
             class="mt-1 p-2 w-full border rounded focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
+        <div>
+          <label for="edit-current-page" class="block text-sm font-medium text-gray-700">Current Page</label>
+          <input
+            type="number"
+            id="edit-current-page"
+            required
+            class="mt-1 p-2 w-full border rounded focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
         <fieldset class="border p-3 rounded">
           <legend class="text-sm font-medium">Goal</legend>
           <div class="space-y-1">
@@ -748,7 +760,7 @@
         const yesterdayStr = formatDate(yesterday);
         
         // Get pages read up to yesterday
-        const sortedHistory = [...this.readingHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
+        const sortedHistory = [...this.readingHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
         const pagesAsOfYesterday = sortedHistory.find(entry => entry.date <= yesterdayStr)?.totalPages || 0;
         
         // Calculate remaining pages from yesterday's progress
@@ -763,21 +775,13 @@
       }
 
       lockDailyGoalFor(dateStr) {
-        // Check if we have a locked goal for this date
+        const todayStr = formatDate(new Date());
+        if (dateStr === todayStr) {
+          this.lockedDailyGoals[todayStr] = this.calculateDailyGoalFromYesterday(todayStr);
+          return this.lockedDailyGoals[todayStr];
+        }
         if (!this.lockedDailyGoals[dateStr]) {
           this.lockedDailyGoals[dateStr] = this.calculateDailyGoalFromYesterday(dateStr);
-        } else {
-          // Check if the locked goal is from a previous day
-          const today = formatDate(new Date());
-          if (dateStr === today) {
-            // For today, check if we have any goals locked for previous days
-            const previousDays = Object.keys(this.lockedDailyGoals).filter(date => date < today);
-            if (previousDays.length > 0) {
-              // Clear old locked goals and recalculate for today
-              this.lockedDailyGoals = {};
-              this.lockedDailyGoals[today] = this.calculateDailyGoalFromYesterday(today);
-            }
-          }
         }
         return this.lockedDailyGoals[dateStr];
       }
@@ -925,7 +929,7 @@
               const yesterday = new Date(today);
               yesterday.setDate(yesterday.getDate() - 1);
               const yesterdayStr = formatDate(yesterday);
-              const sortedHistory = [...book.readingHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
+              const sortedHistory = [...book.readingHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
               const pagesAsOfYesterday = sortedHistory.find(entry => entry.date <= yesterdayStr)?.totalPages || 0;
               const targetPage = Math.min(pagesAsOfYesterday + dailyGoal, book.totalPages);
               const isCollapsed = this.collapsedBooks.has(originalIndex.toString());
@@ -1290,6 +1294,25 @@
             }
           });
         }
+        const updateTodaysGoalBtn = $("update-todays-goal-btn");
+        if (updateTodaysGoalBtn) {
+          updateTodaysGoalBtn.addEventListener("click", () => {
+            const today = new Date();
+            const todayStr = formatDate(today);
+            console.log("Updating today's goal for date:", todayStr);
+            this.books.forEach(book => {
+              if (book.status !== 'paused') {
+                console.log("Before update for book", book.title, "lockedDailyGoals:", JSON.stringify(book.lockedDailyGoals));
+                delete book.lockedDailyGoals[todayStr];
+                const newGoal = book.getDailyGoal(today);
+                console.log("After update for book", book.title, "new goal:", newGoal, "lockedDailyGoals:", JSON.stringify(book.lockedDailyGoals));
+              }
+            });
+            this.saveBooks();
+            this.updateUI();
+            alert("Today's goals have been updated!");
+          });
+        }
       }
 
       toggleBookContent(index) {
@@ -1325,6 +1348,7 @@
         $("edit-book-index").value = bookIndex;
         $("edit-book-title").value = book.title;
         $("edit-total-pages").value = book.totalPages;
+        $("edit-current-page").value = book.currentPage;
         $("edit-start-date").value = book.startDate;
         $("edit-goal-date").checked = book.goalType === "date";
         $("edit-goal-pages").checked = book.goalType === "pages";
@@ -1388,6 +1412,7 @@
         const formData = {
           title: $("edit-book-title").value,
           totalPages: parseInt($("edit-total-pages").value, 10),
+          currentPage: parseInt($("edit-current-page").value, 10),
           startDate: $("edit-start-date").value,
           goalType: document.querySelector('input[name="edit-goal-type"]:checked')?.value,
           targetDate: $("edit-target-date").value,
@@ -1409,7 +1434,8 @@
           data.startDate &&
           data.goalType &&
           ((data.goalType === "date" && data.targetDate) ||
-            (data.goalType === "pages" && !isNaN(data.pagesPerDay) && data.pagesPerDay > 0))
+            (data.goalType === "pages" && !isNaN(data.pagesPerDay) && data.pagesPerDay > 0)) &&
+          (data.currentPage === undefined || (!isNaN(data.currentPage) && data.currentPage >= 0 && data.currentPage <= data.totalPages))
         );
       }
 
