@@ -27,6 +27,37 @@
     .add-book-btn:hover {
       transform: scale(1.1);
     }
+    
+    /* Add new modal close button styles */
+    .modal-close-btn {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #f3f4f6;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      padding: 0;
+      color: #6b7280;
+    }
+    
+    .modal-close-btn:hover {
+      background-color: #e5e7eb;
+      color: #374151;
+      transform: scale(1.05);
+    }
+    
+    .modal-close-btn:active {
+      transform: scale(0.95);
+    }
+    
+    .modal-close-btn svg {
+      width: 1.25rem;
+      height: 1.25rem;
+    }
     .heatmap-cell {
       height: clamp(48px, 10vw, 64px);
       border: 1px solid #e5e7eb;
@@ -248,7 +279,11 @@
       <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-lg font-semibold">Add New Book</h2>
-          <button type="button" class="modal-close text-gray-500 hover:text-gray-700">×</button>
+          <button type="button" class="modal-close modal-close-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
         <form id="add-book-form" class="space-y-3">
           <div>
@@ -382,7 +417,11 @@
     <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-lg font-semibold">Edit Reading Goal</h3>
-        <button type="button" class="modal-close text-gray-500 hover:text-gray-700">×</button>
+        <button type="button" class="modal-close modal-close-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
       <form id="edit-goal-form" class="space-y-4">
         <div>
@@ -421,7 +460,11 @@
             <h3 class="text-lg leading-6 font-medium text-gray-900">
               Edit Reading History
             </h3>
-            <button type="button" class="modal-close text-gray-500 hover:text-gray-700">×</button>
+            <button type="button" class="modal-close modal-close-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
           <div class="mt-2">
             <p class="text-sm text-gray-500">
@@ -498,12 +541,10 @@
     <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-lg font-semibold">Edit Book</h2>
-        <button
-          type="button"
-          onclick="closeEditBookModal()"
-          class="text-gray-500 hover:text-gray-700"
-        >
-          ×
+        <button type="button" onclick="closeEditBookModal()" class="modal-close-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </button>
       </div>
       <form id="edit-book-form" class="space-y-3">
@@ -593,7 +634,11 @@
     <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-lg font-semibold">Settings</h2>
-        <button type="button" class="modal-close text-gray-500 hover:text-gray-700">×</button>
+        <button type="button" class="modal-close modal-close-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
       <div class="space-y-4">
         <div class="flex items-center justify-between">
@@ -718,8 +763,21 @@
       }
 
       lockDailyGoalFor(dateStr) {
+        // Check if we have a locked goal for this date
         if (!this.lockedDailyGoals[dateStr]) {
           this.lockedDailyGoals[dateStr] = this.calculateDailyGoalFromYesterday(dateStr);
+        } else {
+          // Check if the locked goal is from a previous day
+          const today = formatDate(new Date());
+          if (dateStr === today) {
+            // For today, check if we have any goals locked for previous days
+            const previousDays = Object.keys(this.lockedDailyGoals).filter(date => date < today);
+            if (previousDays.length > 0) {
+              // Clear old locked goals and recalculate for today
+              this.lockedDailyGoals = {};
+              this.lockedDailyGoals[today] = this.calculateDailyGoalFromYesterday(today);
+            }
+          }
         }
         return this.lockedDailyGoals[dateStr];
       }
@@ -933,23 +991,6 @@
                               <p class="text-sm font-medium text-blue-800">
                                 Today's Goal: Page ${targetPage}
                               </p>
-                            </div>
-                            <div class="mt-2 flex items-center space-x-2">
-                              <input
-                                type="number"
-                                class="p-1.5 w-full border rounded text-sm focus:ring-blue-500 focus:border-blue-500"
-                                value="${todayReading}"
-                                min="0"
-                                max="${book.totalPages}"
-                                data-book-index="${originalIndex}"
-                              />
-                              <button
-                                type="button"
-                                class="bg-blue-500 text-white py-1.5 px-3 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-xs update-progress-btn"
-                                data-book-index="${originalIndex}"
-                              >
-                                Update
-                              </button>
                             </div>
                           ` : `
                             <div class="mt-1 p-2 bg-gray-50 border border-gray-200 rounded-md">
