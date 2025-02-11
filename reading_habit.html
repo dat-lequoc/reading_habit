@@ -997,12 +997,14 @@
           let currentY = 0;
           let yOffset = 0;
           let lastKnownPosition = null;
+          let isDragHandleClick = false;
 
           const getDragTarget = (element) => {
             return element.closest(".book-entry") || element;
           };
 
           const startDragging = (e, target) => {
+            isDragHandleClick = true;
             draggedElement = target;
             draggedElement.classList.add("dragging");
             
@@ -1092,6 +1094,11 @@
             currentY = 0;
             yOffset = 0;
             lastKnownPosition = null;
+
+            // Reset drag handle click flag after a short delay
+            setTimeout(() => {
+              isDragHandleClick = false;
+            }, 100);
           };
 
           const findDropTarget = (position) => {
@@ -1126,6 +1133,12 @@
 
           // Click event handlers
           this.$bookEntries.addEventListener("click", (e) => {
+            // If the click originated from a drag handle or we're dragging, ignore it
+            if (isDragHandleClick || draggedElement || e.target.closest('.drag-handle')) {
+              e.stopPropagation();
+              return;
+            }
+
             const target = e.target;
             const container = target.closest("[data-book-index]");
             if (!container) return;
